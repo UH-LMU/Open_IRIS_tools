@@ -1,0 +1,22 @@
+'Instrument','Price type','Prime-time','Off-hours','Night time'
+'Leica SP8 STED','HiLIFE internal',22,17,13
+'Leica SP8 upright','HiLIFE internal',20,16,12
+'Leica TCS SP5 MP SMD FLIM','HiLIFE internal',22,17,13
+'Leica TCS SP5 II HCS-A','HiLIFE internal',22,17,13
+'Leica DM5000B','HiLIFE internal',3,2,2
+'Zeiss LSM700','HiLIFE internal',18,14,10
+'Zeiss Z.1 LightSheet Lasers','HiLIFE internal',18,14,10
+'Zeiss Z.1 LightSheet Data management','HiLIFE internal',2,2,1
+'3I Marianas base with lasers','HiLIFE internal',18,14,10
+'3I Marianas no lasers','HiLIFE internal',9,7,5
+'Aurox Clarity','HiLIFE internal',9,7,5
+'GE Deltavision Ultra','HiLIFE internal',9,7,5
+'MolecularDevices Nano','HiLIFE internal',9,6,6
+'Cell-IQ','HiLIFE internal',2,2,2
+'Cell-IQ fluorescence','HiLIFE internal',2,2,2
+'3D Workstation','HiLIFE internal',5,3,3
+'LS Workstation','HiLIFE internal',5,3,3
+'HELMI 3D VM','HiLIFE internal',5,3,3
+'HCA Workstation','HiLIFE internal',3,1,1
+'2D Workstation','HiLIFE internal',3,1,1
+'ONI Nanoimager S','HiLIFE internal',18,14,14
