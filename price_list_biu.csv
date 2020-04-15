@@ -1,122 +1,121 @@
 'Instrument','Price type','Prime-time','Off-hours','Night time'
 'Leica TCS SP8 X with white light laser','HiLIFE internal',22,17,17
-'Leica TCS SP8 X with white light laser','HiLIFE External',22,17,17
-'Leica TCS SP8 X with white light laser','HiLIFE Commercial',22,17,17
 'Leica TCS SP8 X with white light laser','HiLIFE HUS',22,17,17
-'Leica TCS SP8 X with white light laser','Default',22,17,17
+'Leica TCS SP8 X with white light laser','HiLIFE External',25.3,19.6,19.6
+'Leica TCS SP8 X with white light laser','HiLIFE Commercial',106.5,106.5,106.5
+'Leica TCS SP8 X with white light laser','Default',106.5,106.5,106.5
 'Leica TCS SP8 CARS','HiLIFE internal',22,17,17
-'Leica TCS SP8 CARS','HiLIFE External',22,17,17
-'Leica TCS SP8 CARS','HiLIFE Commercial',22,17,17
 'Leica TCS SP8 CARS','HiLIFE HUS',22,17,17
-'Leica TCS SP8 CARS','Default',22,17,17
+'Leica TCS SP8 CARS','HiLIFE External',25.3,19.6,19.6
+'Leica TCS SP8 CARS','HiLIFE Commercial',106.5,106.5,106.5
+'Leica TCS SP8 CARS','Default',106.5,106.5,106.5
 'Zeiss LSM 880 with Airyscan','HiLIFE internal',22,17,17
-'Zeiss LSM 880 with Airyscan','HiLIFE External',22,17,17
-'Zeiss LSM 880 with Airyscan','HiLIFE Commercial',22,17,17
 'Zeiss LSM 880 with Airyscan','HiLIFE HUS',22,17,17
-'Zeiss LSM 880 with Airyscan','Default',22,17,17
+'Zeiss LSM 880 with Airyscan','HiLIFE External',25.3,19.6,19.6
+'Zeiss LSM 880 with Airyscan','HiLIFE Commercial',106.5,106.5,106.5
+'Zeiss LSM 880 with Airyscan','Default',106.5,106.5,106.5
 'Zeiss LSM 780','HiLIFE internal',22,17,17
-'Zeiss LSM 780','HiLIFE External',22,17,17
-'Zeiss LSM 780','HiLIFE Commercial',22,17,17
 'Zeiss LSM 780','HiLIFE HUS',22,17,17
-'Zeiss LSM 780','Default',22,17,17
+'Zeiss LSM 780','HiLIFE External',25.3,19.6,19.6
+'Zeiss LSM 780','HiLIFE Commercial',106.5,106.5,106.5
+'Zeiss LSM 780','Default',106.5,106.5,106.5
 'Andor Dragonfly 505','HiLIFE internal',22,17,17
-'Andor Dragonfly 505','HiLIFE External',22,17,17
-'Andor Dragonfly 505','HiLIFE Commercial',22,17,17
 'Andor Dragonfly 505','HiLIFE HUS',22,17,17
-'Andor Dragonfly 505','Default',22,17,17
+'Andor Dragonfly 505','HiLIFE External',25.3,19.6,19.6
+'Andor Dragonfly 505','HiLIFE Commercial',106.5,106.5,106.5
+'Andor Dragonfly 505','Default',106.5,106.5,106.5
 'GE Deltavision OMX SR microscopy base','HiLIFE internal',22,17,17
-'GE Deltavision OMX SR microscopy base','HiLIFE External',22,17,17
-'GE Deltavision OMX SR microscopy base','HiLIFE Commercial',22,17,17
 'GE Deltavision OMX SR microscopy base','HiLIFE HUS',22,17,17
-'GE Deltavision OMX SR microscopy base','Default',22,17,17
+'GE Deltavision OMX SR microscopy base','HiLIFE External',25.3,19.6,19.6
+'GE Deltavision OMX SR microscopy base','HiLIFE Commercial',106.5,106.5,106.5
+'GE Deltavision OMX SR microscopy base','Default',106.5,106.5,106.5
 'LaVision BioTec UltraMicroscope II','HiLIFE internal',12,9,9
-'LaVision BioTec UltraMicroscope II','HiLIFE External',12,9,9
-'LaVision BioTec UltraMicroscope II','HiLIFE Commercial',12,9,9
 'LaVision BioTec UltraMicroscope II','HiLIFE HUS',12,9,9
-'LaVision BioTec UltraMicroscope II','Default',12,9,9
-'Nikon Eclipse Ti-E (2)','HiLIFE internal',6,4.5,4.5
-'Nikon Eclipse Ti-E (2)','HiLIFE External',6,4.5,4.5
-'Nikon Eclipse Ti-E (2)','HiLIFE Commercial',6,4.5,4.5
-'Nikon Eclipse Ti-E (2)','HiLIFE HUS',6,4.5,4.5
-'Nikon Eclipse Ti-E (2)','Default',6,4.5,4.5
-'Nikon Eclipse Ti-E (3) Primo','HiLIFE internal',5,3,3
-'Nikon Eclipse Ti-E (3) Primo','HiLIFE External',5,3,3
-'Nikon Eclipse Ti-E (3) Primo','HiLIFE Commercial',5,3,3
-'Nikon Eclipse Ti-E (3) Primo','HiLIFE HUS',5,3,3
-'Nikon Eclipse Ti-E (3) Primo','Default',5,3,3
-'Nikon Ti-E-STORM standard mode','HiLIFE internal',6,4.5,4.5
-'Nikon Ti-E-STORM standard mode','HiLIFE External',6,4.5,4.5
-'Nikon Ti-E-STORM standard mode','HiLIFE Commercial',6,4.5,4.5
-'Nikon Ti-E-STORM standard mode','HiLIFE HUS',6,4.5,4.5
-'Nikon Ti-E-STORM standard mode','Default',6,4.5,4.5
+'LaVision BioTec UltraMicroscope II','HiLIFE External',13.8,10.35,10.35
+'LaVision BioTec UltraMicroscope II','HiLIFE Commercial',58.1,58.1,58.1
+'LaVision BioTec UltraMicroscope II','Default',58.1,58.1,58.1
 'Ti-E-STORM Mode','HiLIFE internal',12,9,9
-'Ti-E-STORM Mode','HiLIFE External',12,9,9
-'Ti-E-STORM Mode','HiLIFE Commercial',12,9,9
 'Ti-E-STORM Mode','HiLIFE HUS',12,9,9
-'Ti-E-STORM Mode','Default',12,9,9
+'Ti-E-STORM Mode','HiLIFE External',13.8,10.35,10.35
+'Ti-E-STORM Mode','HiLIFE Commercial',58.1,58.1,58.1
+'Ti-E-STORM Mode','Default',58.1,58.1,58.1
+'Nikon Ti-E-STORM standard mode','HiLIFE internal',6,4.5,4.5
+'Nikon Ti-E-STORM standard mode','HiLIFE HUS',6,4.5,4.5
+'Nikon Ti-E-STORM standard mode','HiLIFE External',6.9,5.2,5.2
+'Nikon Ti-E-STORM standard mode','HiLIFE Commercial',29,29,29
+'Nikon Ti-E-STORM standard mode','Default',29,29,29
+'Nikon Eclipse Ti-E (2)','HiLIFE internal',6,4.5,4.5
+'Nikon Eclipse Ti-E (2)','HiLIFE HUS',6,4.5,4.5
+'Nikon Eclipse Ti-E (2)','HiLIFE External',6.9,5.2,5.2
+'Nikon Eclipse Ti-E (2)','HiLIFE Commercial',29,29,29
+'Nikon Eclipse Ti-E (2)','Default',29,29,29
+'Nikon Eclipse Ti-E (3) Primo','HiLIFE internal',5,3,3
+'Nikon Eclipse Ti-E (3) Primo','HiLIFE HUS',5,3,3
+'Nikon Eclipse Ti-E (3) Primo','HiLIFE External',5.8,3.45,3.45
+'Nikon Eclipse Ti-E (3) Primo','HiLIFE Commercial',24.2,24.2,24.2
+'Nikon Eclipse Ti-E (3) Primo','Default',24.2,24.2,24.2
 'Zeiss Axio Imager 1','HiLIFE internal',5,3,3
-'Zeiss Axio Imager 1','HiLIFE External',5,3,3
-'Zeiss Axio Imager 1','HiLIFE Commercial',5,3,3
 'Zeiss Axio Imager 1','HiLIFE HUS',5,3,3
-'Zeiss Axio Imager 1','Default',5,3,3
+'Zeiss Axio Imager 1','HiLIFE External',5.8,3.45,3.45
+'Zeiss Axio Imager 1','HiLIFE Commercial',24.2,24.2,24.2
+'Zeiss Axio Imager 1','Default',24.2,24.2,24.2
 'Zeiss Axio Imager 2 with ApoTome','HiLIFE internal',5,3,3
-'Zeiss Axio Imager 2 with ApoTome','HiLIFE External',5,3,3
-'Zeiss Axio Imager 2 with ApoTome','HiLIFE Commercial',5,3,3
 'Zeiss Axio Imager 2 with ApoTome','HiLIFE HUS',5,3,3
-'Zeiss Axio Imager 2 with ApoTome','Default',5,3,3
+'Zeiss Axio Imager 2 with ApoTome','HiLIFE External',5.8,3.45,3.45
+'Zeiss Axio Imager 2 with ApoTome','HiLIFE Commercial',24.2,24.2,24.2
+'Zeiss Axio Imager 2 with ApoTome','Default',24.2,24.2,24.2
 'Thermo EVOS FL','HiLIFE internal',2,2,2
-'Thermo EVOS FL','HiLIFE External',2,2,2
-'Thermo EVOS FL','HiLIFE Commercial',2,2,2
 'Thermo EVOS FL','HiLIFE HUS',2,2,2
-'Thermo EVOS FL','Default',2,2,2
+'Thermo EVOS FL','HiLIFE External',2.3,2.3,2.3
+'Thermo EVOS FL','HiLIFE Commercial',12,12,12
+'Thermo EVOS FL','Default',12,12,12
 'Thermo CellInsight','HiLIFE internal',9,6,6
-'Thermo CellInsight','HiLIFE External',9,6,6
-'Thermo CellInsight','HiLIFE Commercial',9,6,6
 'Thermo CellInsight','HiLIFE HUS',9,6,6
-'Thermo CellInsight','Default',9,6,6
+'Thermo CellInsight','HiLIFE External',12.83,8.56,8.56
+'Thermo CellInsight','HiLIFE Commercial',24.2,24.2,24.2
+'Thermo CellInsight','Default',54,54,54
 'ImageXpress Pico','HiLIFE internal',9,6,6
-'ImageXpress Pico','HiLIFE External',9,6,6
-'ImageXpress Pico','HiLIFE Commercial',9,6,6
 'ImageXpress Pico','HiLIFE HUS',9,6,6
-'ImageXpress Pico','Default',9,6,6
+'ImageXpress Pico','HiLIFE External',12.83,8.56,8.56
+'ImageXpress Pico','HiLIFE Commercial',24.2,24.2,24.2
+'ImageXpress Pico','Default',54,54,54
 'BIU 3D VM','HiLIFE internal',5,3,3
-'BIU 3D VM','HiLIFE External',5,3,3
-'BIU 3D VM','HiLIFE Commercial',5,3,3
 'BIU 3D VM','HiLIFE HUS',5,3,3
-'BIU 3D VM','Default',5,3,3
-'Imaging workstation 1-2','HiLIFE internal',3,1,1
-'Imaging workstation 1-2','HiLIFE External',3,1,1
-'Imaging workstation 1-2','HiLIFE Commercial',3,1,1
-'Imaging workstation 1-2','HiLIFE HUS',3,1,1
-'Imaging workstation 1-2','Default',3,1,1
-'Imaging workstation 2','HiLIFE internal',3,1,1
-'Imaging workstation 2','HiLIFE External',3,1,1
-'Imaging workstation 2','HiLIFE Commercial',3,1,1
-'Imaging workstation 2','HiLIFE HUS',3,1,1
-'Imaging workstation 2','Default',3,1,1
+'BIU 3D VM','HiLIFE External',5.8,3.45,3.45
+'BIU 3D VM','HiLIFE Commercial',24.2,14.5,14.5
+'BIU 3D VM','Default',24.2,18,18
 'Imaging workstation 3','HiLIFE internal',5,3,3
-'Imaging workstation 3','HiLIFE External',5,3,3
-'Imaging workstation 3','HiLIFE Commercial',5,3,3
 'Imaging workstation 3','HiLIFE HUS',5,3,3
-'Imaging workstation 3','Default',5,3,3
+'Imaging workstation 3','HiLIFE External',5.8,3.45,3.45
+'Imaging workstation 3','HiLIFE Commercial',24.2,14.5,14.5
+'Imaging workstation 3','Default',24.2,18,18
+'Imaging workstation 1-2','HiLIFE internal',3,1,1
+'Imaging workstation 1-2','HiLIFE HUS',3,1,1
+'Imaging workstation 1-2','HiLIFE External',3.45,1.15,1.15
+'Imaging workstation 1-2','HiLIFE Commercial',14.5,4.85,4.85
+'Imaging workstation 1-2','Default',14.5,4.85,4.85
+'Imaging workstation 2','HiLIFE internal',3,1,1
+'Imaging workstation 2','HiLIFE HUS',3,1,1
+'Imaging workstation 2','HiLIFE External',3.45,1.15,1.15
+'Imaging workstation 2','HiLIFE Commercial',14.5,4.85,4.85
+'Imaging workstation 2','Default',14.5,4.85,4.85
 'Lago','HiLIFE internal',10,10,10
-'Lago','HiLIFE External',10,10,10
-'Lago','HiLIFE Commercial',10,10,10
 'Lago','HiLIFE HUS',10,10,10
-'Lago','Default',10,10,10
+'Lago','HiLIFE External',11.5,11.5,11.5
+'Lago','HiLIFE Commercial',48.4,48.4,48.4
+'Lago','Default',48.4,48.4,48.4
 'Lago anesthesia','HiLIFE internal',10,10,10
-'Lago anesthesia','HiLIFE External',10,10,10
-'Lago anesthesia','HiLIFE Commercial',10,10,10
 'Lago anesthesia','HiLIFE HUS',10,10,10
-'Lago anesthesia','Default',10,10,10
+'Lago anesthesia','HiLIFE External',11.5,11.5,11.5
+'Lago anesthesia','HiLIFE Commercial',48.4,48.4,48.4
+'Lago anesthesia','Default',48.4,48.4,48.4
 'Lago imaging','HiLIFE internal',10,10,10
-'Lago imaging','HiLIFE External',10,10,10
-'Lago imaging','HiLIFE Commercial',10,10,10
 'Lago imaging','HiLIFE HUS',10,10,10
-'Lago imaging','Default',10,10,10
+'Lago imaging','HiLIFE External',11.5,11.5,11.5
+'Lago imaging','HiLIFE Commercial',48.4,48.4,48.4
+'Lago imaging','Default',48.4,48.4,48.4
 'Zeiss LSM 7 with OPO','HiLIFE internal',22,22,22
-'Zeiss LSM 7 with OPO','HiLIFE External',22,22,22
-'Zeiss LSM 7 with OPO','HiLIFE Commercial',22,22,22
 'Zeiss LSM 7 with OPO','HiLIFE HUS',22,22,22
-'Zeiss LSM 7 with OPO','Default',22,22,22
-
+'Zeiss LSM 7 with OPO','HiLIFE External',25.3,25.3,25.3
+'Zeiss LSM 7 with OPO','HiLIFE Commercial',106.5,106.5,106.5
+'Zeiss LSM 7 with OPO','Default',106.5,106.5,106.5
