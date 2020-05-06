@@ -1,64 +1,68 @@
-'Instrument','Price type','Prime-time','Off-hours','Night time'
-'Leica SP8 STED','HiLIFE internal',22,17,13
-'Leica SP8 upright','HiLIFE internal',20,16,12
-'Leica TCS SP5 MP SMD FLIM','HiLIFE internal',22,17,13
-'Leica TCS SP5 II HCS-A','HiLIFE internal',22,17,13
-'Leica DM5000B','HiLIFE internal',3,2,2
-'Zeiss LSM700','HiLIFE internal',18,14,10
-'Zeiss Z.1 LightSheet Lasers','HiLIFE internal',18,14,10
-'Zeiss Z.1 LightSheet Data management','HiLIFE internal',2,2,1
-'3I Marianas base with lasers','HiLIFE internal',18,14,10
-'3I Marianas no lasers','HiLIFE internal',9,7,5
-'Aurox Clarity','HiLIFE internal',9,7,5
-'GE Deltavision Ultra','HiLIFE internal',9,7,5
-'MolecularDevices Nano','HiLIFE internal',9,6,6
-'Cell-IQ','HiLIFE internal',2,2,2
-'Cell-IQ fluorescence','HiLIFE internal',2,2,2
-'3D Workstation','HiLIFE internal',5,3,3
-'LS Workstation','HiLIFE internal',5,3,3
-'HELMI 3D VM','HiLIFE internal',5,3,3
-'HCA Workstation','HiLIFE internal',3,1,1
-'2D Workstation','HiLIFE internal',3,1,1
-'ONI Nanoimager S','HiLIFE internal',18,14,14
-'Leica SP8 STED','HiLIFE External',22,17,13
-'Leica SP8 upright','HiLIFE External',20,16,12
-'Leica TCS SP5 MP SMD FLIM','HiLIFE External',22,17,13
-'Leica TCS SP5 II HCS-A','HiLIFE External',22,17,13
-'Leica DM5000B','HiLIFE External',3,2,2
-'Zeiss LSM700','HiLIFE External',18,14,10
-'Zeiss Z.1 LightSheet Lasers','HiLIFE External',18,14,10
-'Zeiss Z.1 LightSheet Data management','HiLIFE External',2,2,1
-'3I Marianas base with lasers','HiLIFE External',18,14,10
-'3I Marianas no lasers','HiLIFE External',9,7,5
-'Aurox Clarity','HiLIFE External',9,7,5
-'GE Deltavision Ultra','HiLIFE External',9,7,5
-'MolecularDevices Nano','HiLIFE External',9,6,6
-'Cell-IQ','HiLIFE External',2,2,2
-'Cell-IQ fluorescence','HiLIFE External',2,2,2
-'3D Workstation','HiLIFE External',5,3,3
-'LS Workstation','HiLIFE External',5,3,3
-'HELMI 3D VM','HiLIFE External',5,3,3
-'HCA Workstation','HiLIFE External',3,1,1
-'2D Workstation','HiLIFE External',3,1,1
-'ONI Nanoimager S','HiLIFE External',18,14,14
-'Leica SP8 STED','HiLIFE Commercial',132,102,78
-'Leica SP8 upright','HiLIFE Commercial',120,96,72
-'Leica TCS SP5 MP SMD FLIM','HiLIFE Commercial',132,102,78
-'Leica TCS SP5 II HCS-A','HiLIFE Commercial',132,102,78
-'Leica DM5000B','HiLIFE Commercial',18,12,12
-'Zeiss LSM700','HiLIFE Commercial',108,84,60
-'Zeiss Z.1 LightSheet Lasers','HiLIFE Commercial',108,84,60
-'Zeiss Z.1 LightSheet Data management','HiLIFE Commercial',12,12,6
-'3I Marianas base with lasers','HiLIFE Commercial',108,84,60
-'3I Marianas no lasers','HiLIFE Commercial',54,42,30
-'Aurox Clarity','HiLIFE Commercial',54,42,30
-'GE Deltavision Ultra','HiLIFE Commercial',54,42,30
-'MolecularDevices Nano','HiLIFE Commercial',54,36,36
-'Cell-IQ','HiLIFE Commercial',12,12,12
-'Cell-IQ fluorescence','HiLIFE Commercial',12,12,12
-'3D Workstation','HiLIFE Commercial',30,18,18
-'LS Workstation','HiLIFE Commercial',30,18,18
-'HELMI 3D VM','HiLIFE Commercial',30,18,18
-'HCA Workstation','HiLIFE Commercial',18,6,6
-'2D Workstation','HiLIFE Commercial',18,6,6
-'ONI Nanoimager S','HiLIFE Commercial',108,84,84
+'Instrument','Price type','Prime-time','Off-hours','Night time','Cancellation fee'
+'Leica SP8 STED','HiLIFE internal',22,17,13,
+'Leica SP8 upright','HiLIFE internal',20,16,12,
+'Leica TCS SP5 MP SMD FLIM','HiLIFE internal',22,17,13,
+'Leica TCS SP5 II HCS-A','HiLIFE internal',22,17,13,
+'Leica DM5000B','HiLIFE internal',3,2,2,
+'Zeiss LSM700','HiLIFE internal',18,14,10,
+'Zeiss Z.1 LightSheet Lasers','HiLIFE internal',18,14,10,
+'Zeiss Z.1 LightSheet Data management','HiLIFE internal',2,2,1,
+'3I Marianas base with lasers','HiLIFE internal',18,14,10,
+'3I Marianas no lasers','HiLIFE internal',9,7,5,
+'Aurox Clarity','HiLIFE internal',9,7,5,
+'GE Deltavision Ultra','HiLIFE internal',9,7,5,
+'MolecularDevices Nano','HiLIFE internal',9,6,6,
+'Cell-IQ','HiLIFE internal',2,2,2,
+'Cell-IQ fluorescence','HiLIFE internal',2,2,2,
+'3D Workstation','HiLIFE internal',5,3,3,
+'LS Workstation','HiLIFE internal',5,3,3,
+'HELMI 3D VM','HiLIFE internal',5,3,3,
+'HCA Workstation','HiLIFE internal',3,1,1,
+'2D Workstation','HiLIFE internal',3,1,1,
+'ONI Nanoimager S','HiLIFE internal',18,14,14,
+'Leica SP8 STED','HiLIFE External',22,17,13,
+'Leica SP8 upright','HiLIFE External',20,16,12,
+'Leica TCS SP5 MP SMD FLIM','HiLIFE External',22,17,13,
+'Leica TCS SP5 II HCS-A','HiLIFE External',22,17,13,
+'Leica DM5000B','HiLIFE External',3,2,2,
+'Zeiss LSM700','HiLIFE External',18,14,10,
+'Zeiss Z.1 LightSheet Lasers','HiLIFE External',18,14,10,
+'Zeiss Z.1 LightSheet Data management','HiLIFE External',2,2,1,
+'3I Marianas base with lasers','HiLIFE External',18,14,10,
+'3I Marianas no lasers','HiLIFE External',9,7,5,
+'Aurox Clarity','HiLIFE External',9,7,5,
+'GE Deltavision Ultra','HiLIFE External',9,7,5,
+'MolecularDevices Nano','HiLIFE External',9,6,6,
+'Cell-IQ','HiLIFE External',2,2,2,
+'Cell-IQ fluorescence','HiLIFE External',2,2,2,
+'3D Workstation','HiLIFE External',5,3,3,
+'LS Workstation','HiLIFE External',5,3,3,
+'HELMI 3D VM','HiLIFE External',5,3,3,
+'HCA Workstation','HiLIFE External',3,1,1,
+'2D Workstation','HiLIFE External',3,1,1,
+'ONI Nanoimager S','HiLIFE External',18,14,14,
+'Leica SP8 STED','HiLIFE Commercial',132,102,78,
+'Leica SP8 upright','HiLIFE Commercial',120,96,72,
+'Leica TCS SP5 MP SMD FLIM','HiLIFE Commercial',132,102,78,
+'Leica TCS SP5 II HCS-A','HiLIFE Commercial',132,102,78,
+'Leica DM5000B','HiLIFE Commercial',18,12,12,
+'Zeiss LSM700','HiLIFE Commercial',108,84,60,
+'Zeiss Z.1 LightSheet Lasers','HiLIFE Commercial',108,84,60,
+'Zeiss Z.1 LightSheet Data management','HiLIFE Commercial',12,12,6,
+'3I Marianas base with lasers','HiLIFE Commercial',108,84,60,
+'3I Marianas no lasers','HiLIFE Commercial',54,42,30,
+'Aurox Clarity','HiLIFE Commercial',54,42,30,
+'GE Deltavision Ultra','HiLIFE Commercial',54,42,30,
+'MolecularDevices Nano','HiLIFE Commercial',54,36,36,
+'Cell-IQ','HiLIFE Commercial',12,12,12,
+'Cell-IQ fluorescence','HiLIFE Commercial',12,12,12,
+'3D Workstation','HiLIFE Commercial',30,18,18,
+'LS Workstation','HiLIFE Commercial',30,18,18,
+'HELMI 3D VM','HiLIFE Commercial',30,18,18,
+'HCA Workstation','HiLIFE Commercial',18,6,6,
+'2D Workstation','HiLIFE Commercial',18,6,6,
+'ONI Nanoimager S','HiLIFE Commercial',108,84,84,
+'kuoppalevy','HiLIFE internal',10,,,
+'kuoppalevy','HiLIFE External',12,,,
+'kuoppalevy','HiLIFE Commercial',20,,,
+
