@@ -6,13 +6,13 @@ re_timestamp = re.compile('[0-9]{8}-[0-9]{6}')
 
 def save_invoice_with_timestamp(df, path):
     # remove old timestamp
-    stem = re.sub(r'[0-9]{8}-[0-9]{6}','', path.stem)
+    stem = re.sub(r'__[0-9]{8}-[0-9]{6}','', path.stem)
     
     # create new timestamp
     timestamp = str(datetime.now().strftime("%Y%m%d-%H%M%S"))
     
     output = path.parent / (stem + '__' + timestamp + '.xlsx')
-    #print(output)   
+    print('save_invoice_with_timestamp: ' + str(output))   
     df.to_excel(output, index=False)
     
 
@@ -28,8 +28,10 @@ def find_latest_invoice_version(invoice_path):
             #print(t)
             versions.append(t)
     
-    if len(versions) == 0:
-        return invoice_path
-    else:
-        return sorted(versions)[-1]
+    latest = invoice_path
+    if len(versions) > 0:
+        latest = sorted(versions)[-1]
+    
+    print('find_latest_invoice_version: ' + str(latest))   
+    return latest
 
