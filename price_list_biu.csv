@@ -119,3 +119,8 @@
 'Zeiss LSM 7 with OPO','HiLIFE External',25.3,25.3,,
 'Zeiss LSM 7 with OPO','HiLIFE Commercial',132,132,,
 'Zeiss LSM 7 with OPO','Default',132,132,,
+'Quantum GX2 microCT','HiLIFE internal',50,50,,
+'Quantum GX2 microCT','HiLIFE HUS',50,50,,
+'Quantum GX2 microCT','HiLIFE External',57.5,57.5,,
+'Quantum GX2 microCT','HiLIFE Commercial',300,300,,
+'Quantum GX2 microCT','Default',300,300,,
