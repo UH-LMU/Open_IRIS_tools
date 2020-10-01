@@ -58,7 +58,7 @@ def check_totals(dataframe,tag,INVOICE_DIR,basename,ext='.xlsx'):
     print("grouped by WBS: " + str(total_wbs))
 
     # totals by instrument
-    tmp = _df.groupby(['Resource'])['Charge'].sum().reset_index()
+    tmp = _df.groupby(['Resource/Product'])['Charge'].sum().reset_index()
     tmp.loc['Column_Total']= tmp.sum(numeric_only=True, axis=0)
     tmp.to_excel(INVOICE_DIR / ("test_ " + basename + "__totals_by_resource_" + tag  + ext), index=False)
     total_resource = round(tmp.loc['Column_Total']['Charge'],2)
