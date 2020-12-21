@@ -124,3 +124,8 @@
 'Quantum GX2 microCT','HiLIFE External',57.5,57.5,,
 'Quantum GX2 microCT','HiLIFE Commercial',300,300,,
 'Quantum GX2 microCT','Default',300,300,,
+'Leica Thunder Imager Model Organism','HiLIFE internal',5,3,,
+'Leica Thunder Imager Model Organism','HiLIFE HUS',5,3,,
+'Leica Thunder Imager Model Organism','HiLIFE External',5.75,3.45,,
+'Leica Thunder Imager Model Organism','HiLIFE Commercial',30,30.01,,
+'Leica Thunder Imager Model Organism','Default',30,30.01,,
