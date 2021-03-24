@@ -24,10 +24,10 @@
 'Andor Dragonfly 505','HiLIFE External',25.3,19.55,,19.55
 'Andor Dragonfly 505','HiLIFE Commercial',132,132.01,,132
 'Andor Dragonfly 505','Default',132,132.01,,132
-'GE Deltavision OMX SR microscopy base','HiLIFE internal',22,17,,
-'GE Deltavision OMX SR microscopy base','HiLIFE HUS',22,17,,
-'GE Deltavision OMX SR microscopy base','HiLIFE External',25.3,19.55,,
-'GE Deltavision OMX SR microscopy base','HiLIFE Commercial',132,132.01,,
+'GE Deltavision OMX SR microscopy base','HiLIFE internal',22,17,,17
+'GE Deltavision OMX SR microscopy base','HiLIFE HUS',22,17,,17
+'GE Deltavision OMX SR microscopy base','HiLIFE External',25.3,19.55,,19.55
+'GE Deltavision OMX SR microscopy base','HiLIFE Commercial',132,132.01,,132.01
 'GE Deltavision OMX SR microscopy base','Default',132,132.01,,
 'LaVision BioTec UltraMicroscope II','HiLIFE internal',12,9,,
 'LaVision BioTec UltraMicroscope II','HiLIFE HUS',12,9,,
@@ -129,3 +129,8 @@
 'Leica Thunder Imager Model Organism','HiLIFE External',5.75,3.45,,
 'Leica Thunder Imager Model Organism','HiLIFE Commercial',30,30.01,,
 'Leica Thunder Imager Model Organism','Default',30,30.01,,
+'Leica Thunder Imager base','HiLIFE internal',5,3,,
+'Leica Thunder Imager base','HiLIFE HUS',5,3,,
+'Leica Thunder Imager base','HiLIFE External',5.75,3.45,,
+'Leica Thunder Imager base','HiLIFE Commercial',30,30.01,,
+'Leica Thunder Imager base','Default',30,30.01,,
