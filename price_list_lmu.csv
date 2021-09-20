@@ -79,7 +79,8 @@
 'High precision cover slips round 18mm (100 pcs/box)','HiLIFE internal',20,,, 
 'Ibidi µ-plate 24 well, Ibidi treat, 180um bottom','HiLIFE internal',22,,, 
 'Mattek dish (collagen coated), sleeve','HiLIFE internal',25,,,
-'Mattek dish (gridded, uncoated), sleeve','HiLIFE internal',40,,,
+'Mattek dish - gridded','HiLIFE internal',40,,,
+'Mattek dish - gridded','HiLIFE External',80,,,
 'Mattek dish (high precision, uncoated), sleeve','HiLIFE internal',25,,,
 'Mattek dish (polylysine coated), sleeve','HiLIFE internal',25,,,
 'Mattek dish (uncoated, #0), sleeve','HiLIFE internal',20,,,
@@ -92,4 +93,6 @@
 'Well-plate VisionPlate 24 well, 190um polystyrene TC','HiLIFE internal',10,,,
 'Ibidi µ-plate 24-well plate','HiLIFE internal',22,,,
 'Ibidi µ-plate 24-well plate','HiLIFE External',44,,,
+'Greiner BioOne Cellview 96-well plate','HiLIFE internal',50,,,
+'Greiner BioOne Cellview 96-well plate','HiLIFE External',100,,,
 
