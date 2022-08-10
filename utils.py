@@ -56,6 +56,7 @@ def check_totals(dataframe,tag,INVOICE_DIR,basename,ext='.xlsx'):
     tmp.to_excel(INVOICE_DIR / ("test_" + basename + "__totals_by_group_and_wbs_" + tag + ext), index=False)
     total_wbs = round(tmp.loc['Column_Total']['Charge'],2)
     print("grouped by WBS: " + str(total_wbs))
+    df_wbs = tmp.copy()
 
     # totals by instrument
     tmp = _df.groupby(['Resource/Product'])['Charge'].sum().reset_index()
@@ -68,4 +69,4 @@ def check_totals(dataframe,tag,INVOICE_DIR,basename,ext='.xlsx'):
         print("Totals don't match.")
         return "Total don't match"
         
-    return total_wbs
+    return total_wbs, df_wbs
