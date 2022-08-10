@@ -53,7 +53,7 @@ def check_totals(dataframe,tag,INVOICE_DIR,basename,ext='.xlsx'):
     # totals by WBS
     tmp = _df.groupby(['Group','Remit code','Cost center code'])['Charge'].sum().reset_index()
     tmp.loc['Column_Total']= tmp.sum(numeric_only=True, axis=0)
-    tmp.to_excel(INVOICE_DIR / ("test_ " + basename + "__totals_by_group_and_wbs_" + tag + ext), index=False)
+    tmp.to_excel(INVOICE_DIR / ("test_" + basename + "__totals_by_group_and_wbs_" + tag + ext), index=False)
     total_wbs = round(tmp.loc['Column_Total']['Charge'],2)
     print("grouped by WBS: " + str(total_wbs))
 
