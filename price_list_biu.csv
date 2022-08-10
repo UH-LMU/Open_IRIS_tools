@@ -1,4 +1,9 @@
 'Instrument','Price type','Prime-time','Off-hours','Night time','Cancellation fee'
+'Leica Stellaris 8 FALCON / DLS','HiLIFE internal',22,17,,17
+'Leica Stellaris 8 FALCON / DLS','HiLIFE HUS',22,17,,17
+'Leica Stellaris 8 FALCON / DLS','HiLIFE External',25.3,19.55,,19.55
+'Leica Stellaris 8 FALCON / DLS','HiLIFE Commercial',132,132,,132
+'Leica Stellaris 8 FALCON / DLS','Default',132,132,,132
 'Leica TCS SP8 X with white light laser','HiLIFE internal',22,17,,17
 'Leica TCS SP8 X with white light laser','HiLIFE HUS',22,17,,17
 'Leica TCS SP8 X with white light laser','HiLIFE External',25.3,19.55,,19.55
@@ -134,6 +139,18 @@
 'Leica Thunder Imager base','HiLIFE External',5.75,3.45,,
 'Leica Thunder Imager base','HiLIFE Commercial',30,30,,
 'Leica Thunder Imager base','Default',30,30,,
-'Ibidi µ-slide 18 Well coverglass bottom (#1.5H)','HiLIFE internal',12.8,,,
-'Ibidi µ-slide 4 Well coverglass bottom (#1.5H)','HiLIFE internal',11.7,,,
-'Ibidi µ-dish 35mm high coverglass bottom (#1.5H)','HiLIFE internal',3,,,
+'Ibidi µ-slide 18 Well coverglass bottom (#1.5H)','HiLIFE internal',12.8,12.8,12.8,
+'Ibidi µ-slide 18 Well coverglass bottom (#1.5H)','HiLIFE HUS',12.8,12.8,12.8,
+'Ibidi µ-slide 18 Well coverglass bottom (#1.5H)','HiLIFE External',12.8,12.8,12.8,
+'Ibidi µ-slide 18 Well coverglass bottom (#1.5H)','HiLIFE Commercial',12.8,12.8,12.8,
+'Ibidi µ-slide 18 Well coverglass bottom (#1.5H)','Default',12.8,12.8,12.8,
+'Ibidi µ-slide 4 Well coverglass bottom (#1.5H)','HiLIFE internal',11.7,11.7,11.7,
+'Ibidi µ-slide 4 Well coverglass bottom (#1.5H)','HiLIFE HUS',11.7,11.7,11.7,
+'Ibidi µ-slide 4 Well coverglass bottom (#1.5H)','HiLIFE External',11.7,11.7,11.7,
+'Ibidi µ-slide 4 Well coverglass bottom (#1.5H)','HiLIFE Commercial',11.7,11.7,11.7,
+'Ibidi µ-slide 4 Well coverglass bottom (#1.5H)','Default',11.7,11.7,11.7,
+'Ibidi µ-dish 35mm high coverglass bottom (#1.5H)','HiLIFE internal',3,3,3,
+'Ibidi µ-dish 35mm high coverglass bottom (#1.5H)','HiLIFE HUS',3,3,3,
+'Ibidi µ-dish 35mm high coverglass bottom (#1.5H)','HiLIFE External',3,3,3,
+'Ibidi µ-dish 35mm high coverglass bottom (#1.5H)','HiLIFE Commercial',3,3,3,
+'Ibidi µ-dish 35mm high coverglass bottom (#1.5H)','Default',3,3,3,
