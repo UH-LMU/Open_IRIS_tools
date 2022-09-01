@@ -67,6 +67,6 @@ def check_totals(dataframe,tag,INVOICE_DIR,basename,ext='.xlsx'):
 
     if total_resource != total_wbs:
         print("Totals don't match.")
-        return "Total don't match"
+        #return "Total don't match"
         
     return total_wbs, df_wbs
