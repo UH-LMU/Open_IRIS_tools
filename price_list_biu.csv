@@ -1,4 +1,9 @@
 'Instrument','Price type','Prime-time','Off-hours','Night time','Cancellation fee'
+'Leica Thunder Imager 3D Cell Culture','HiLIFE internal',22,17,,17
+'Leica Thunder Imager 3D Cell Culture','HiLIFE HUS',22,17,,17
+'Leica Thunder Imager 3D Cell Culture','HiLIFE External',25.3,19.55,,19.55
+'Leica Thunder Imager 3D Cell Culture','HiLIFE Commercial',132,132,,132
+'Leica Thunder Imager 3D Cell Culture','Default',132,132,,132
 'Leica Stellaris 8 FALCON / DLS','HiLIFE internal',22,17,,17
 'Leica Stellaris 8 FALCON / DLS','HiLIFE HUS',22,17,,17
 'Leica Stellaris 8 FALCON / DLS','HiLIFE External',25.3,19.55,,19.55
