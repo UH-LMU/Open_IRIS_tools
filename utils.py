@@ -1,8 +1,33 @@
-from datetime import datetime
 import pandas as pd
-from pathlib import Path
 import re
+from datetime import datetime
+from openpyxl import load_workbook
+from pathlib import Path
 
+def print_wb(xlsx, max_row=5):
+    # Load the Excel file
+    wb = load_workbook(xlsx, data_only=True)
+
+    # Select the active worksheet
+    ws = wb.active
+
+    # Iterate over the rows and print the raw cell values
+    for row in ws.iter_rows(min_row=1, max_row=max_row, values_only=True):  # Adjust max_row as needed
+        print(row)
+
+        
+def set_type_wbs(df):
+    # force wbs codes to be string
+    df['Cost center code'] =  df['Cost center code'].astype(int)
+    df['Cost center code'] =  df['Cost center code'].astype(str)
+    
+    
+def set_type_timestamp(df):
+       # read these columns as datetime
+    df['Booking start'] =  pd.to_datetime(df['Booking start'], format='%Y-%m-%d %H:%M')
+    df['Booking end'] =  pd.to_datetime(df['Booking end'], format='%Y-%m-%d %H:%M')
+
+    
 re_timestamp = re.compile('[0-9]{8}-[0-9]{6}')
 
 def save_invoice_with_timestamp(df, path):
@@ -48,7 +73,7 @@ def check_totals(dataframe,tag,INVOICE_DIR,basename,ext='.xlsx'):
     #_df['Charge'] = _df['Charge'].round(2)
     
     # ungrouped total
-    print("ungrouped: " + str(_df.sum(numeric_only=True, axis=0)['Charge']))
+    print("ungrouped: " + str(_df.sum(numeric_only=True, axis=0)['Charge'].round(2)))
 
     # totals by WBS
     tmp = _df.groupby(['Group','Remit code','Cost center code'])['Charge'].sum().reset_index()
