@@ -18,7 +18,7 @@ def print_wb(xlsx, max_row=5):
         
 def set_type_wbs(df):
     # force wbs codes to be string
-    df['Cost center code'] =  df['Cost center code'].astype(int)
+    #df['Cost center code'] =  df['Cost center code'].astype(int)
     df['Cost center code'] =  df['Cost center code'].astype(str)
     
     
