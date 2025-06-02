@@ -18,6 +18,8 @@
 '3I Marianas no lasers','HiLIFE internal',9,7,5,
 'Zeiss Aurox Clarity','HiLIFE internal',9,7,5,
 'Aurox Clarity','HiLIFE internal',9,7,5,
+'Aurox Clarity - Leica(old)',9,7,5,
+'Aurox Clarity - Zeiss(new)',9,7,5,
 'GE Deltavision Ultra','HiLIFE internal',9,7,5,
 'MolecularDevices Nano','HiLIFE internal',9,6,,
 'MolecularDevices Micro','HiLIFE internal',9,7,5,
