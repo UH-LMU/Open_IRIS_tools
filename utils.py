@@ -17,8 +17,10 @@ def print_wb(xlsx, max_row=5):
 
         
 def set_type_wbs(df):
-    # force wbs codes to be string
-    #df['Cost center code'] =  df['Cost center code'].astype(int)
+    # Force wbs codes to be int, 0 if missing. This works at LMU but may cause problems at BIU.
+    df['Cost center code'] =  df['Cost center code'].fillna(0)
+    df['Cost center code'] =  df['Cost center code'].astype(int)
+    # Convert WBS codes to string.
     df['Cost center code'] =  df['Cost center code'].astype(str)
     
     
