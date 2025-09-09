@@ -28,7 +28,8 @@ COL_COMMENTS_CHARGE = "Comments (charge)"
 COL_REQUEST_ID = "Request ID"
 COL_REQUEST_TITLE = "Request Title"
 COL_REQUESTER = "Requester"
-COL_REQUESTER_EMAIL = 'Requester email'
+COL_REQUESTER_EMAIL = "Requester email"
+COL_ORGANIZATION = "Organization"
 
 # these columns are created for testing
 TMP_IS_PRODUCT = "tmp_is_product"
