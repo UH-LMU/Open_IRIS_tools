@@ -1,4 +1,5 @@
 # these columns are read from the OpenIRIS invoice
+COL_ID = "ID"
 COL_USER_NAME = "User name"
 COL_BOOKING_START = "Booking start"
 COL_BOOKING_END = "Booking end"
