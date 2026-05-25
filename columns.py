@@ -31,6 +31,9 @@ COL_REQUESTER = "Requester"
 COL_REQUESTER_EMAIL = "Requester email"
 COL_ORGANIZATION = "Organization"
 
+# columns added for UH use
+COL_VERIFIER_NAME = "Verifier name(s)"
+
 # these columns are created for testing
 TMP_IS_PRODUCT = "tmp_is_product"
 TMP_REBOOKED = "tmp_rebooked"
@@ -54,3 +57,6 @@ TMP_NUM_ISSUE = "tmp_num_issue"
 TMP_BOOKING_INTERVAL = "tmp_booking_interval"
 TMP_OVERLAPPING_BOOKINGS = "tmp_overlapping_bookings"
 TMP_HAS_OVERLAPPING_BOOKINGS = "tmp_has_overlapping_bookings"
+TMP_VERIFIER_OWNER = "tmp_verifier_owner"
+TMP_VERIFIER_FORM = "tmp_verifier_form"
+
