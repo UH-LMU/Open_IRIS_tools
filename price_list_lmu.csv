@@ -173,4 +173,7 @@
 'LMU special','HiLIFE internal',1,,,
 'LMU special','HiLIFE External',1,,,
 'LMU special','HiLIFE Commercial',1,,,
+'Image analyst','HiLIFE internal',20,,,
+'Image analyst','HiLIFE External',20,,,
+'Image analyst','HiLIFE Commercial',120,,,
 
