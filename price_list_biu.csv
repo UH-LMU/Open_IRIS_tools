@@ -1,9 +1,4 @@
 'Instrument','Price type','Prime-time','Off-hours','Night time','Cancellation fee'
-'Leica Thunder Imager 3D Cell Culture','HiLIFE internal',22,17,,17
-'Leica Thunder Imager 3D Cell Culture','HiLIFE HUS',22,17,,17
-'Leica Thunder Imager 3D Cell Culture','HiLIFE External',25.3,19.55,,19.55
-'Leica Thunder Imager 3D Cell Culture','HiLIFE Commercial',132,132,,132
-'Leica Thunder Imager 3D Cell Culture','Default',132,132,,132
 'Leica Stellaris 8 FALCON / DLS','HiLIFE internal',22,17,,17
 'Leica Stellaris 8 FALCON / DLS','HiLIFE HUS',22,17,,17
 'Leica Stellaris 8 FALCON / DLS','HiLIFE External',25.3,19.55,,19.55
@@ -74,9 +69,9 @@
 'Zeiss Axio Imager 2 with ApoTome','HiLIFE External',5.75,3.45,,
 'Zeiss Axio Imager 2 with ApoTome','HiLIFE Commercial',30,30,,
 'Zeiss Axio Imager 2 with ApoTome','Default',30,30,,
-'Thermo EVOS FL','HiLIFE internal',2,2,,
-'Thermo EVOS FL','HiLIFE HUS',2,2,,
-'Thermo EVOS FL','HiLIFE External',2.3,2.3,,
+'Thermo EVOS FL','HiLIFE internal',0,0,,
+'Thermo EVOS FL','HiLIFE HUS',0,0,,
+'Thermo EVOS FL','HiLIFE External',0,0,,
 'Thermo EVOS FL','HiLIFE Commercial',12,12,,
 'Thermo EVOS FL','Default',12,12,,
 'Thermo CellInsight','HiLIFE internal',9,6,,
@@ -94,6 +89,11 @@
 'BIU 3D VM','HiLIFE External',5.75,3.45,,
 'BIU 3D VM','HiLIFE Commercial',30,30,,
 'BIU 3D VM','Default',30,30,,
+'BIU 3D VM (Win 11)','HiLIFE internal',5,3,,
+'BIU 3D VM (Win 11)','HiLIFE HUS',5,3,,
+'BIU 3D VM (Win 11)','HiLIFE External',5.75,3.45,,
+'BIU 3D VM (Win 11)','HiLIFE Commercial',30,30,,
+'BIU 3D VM (Win 11)','Default',30,30,,
 'Imaging workstation 3','HiLIFE internal',5,3,,
 'Imaging workstation 3','HiLIFE HUS',5,3,,
 'Imaging workstation 3','HiLIFE External',5.75,3.45,,
@@ -194,3 +194,13 @@
 'Molecubes PET/CT','HiLIFE External',74.75,74.75,,
 'Molecubes PET/CT','HiLIFE Commercial',390,390,,
 'Molecubes PET/CT','Default',390,390,,
+'Zeiss ELYRA 7','HiLIFE internal',22,17,,17
+'Zeiss ELYRA 7','HiLIFE HUS',22,17,,17
+'Zeiss ELYRA 7','HiLIFE External',25.3,19.55,,19.55
+'Zeiss ELYRA 7','HiLIFE Commercial',132,132,,132
+'Zeiss ELYRA 7','Default',132,132,,132
+'LabTek chamber slide 8 well','HiLIFE internal',15,15,15,15
+'LabTek chamber slide 8 well','HiLIFE HUS',15,15,15,15
+'LabTek chamber slide 8 well','HiLIFE External',15,15,15,15
+'LabTek chamber slide 8 well','HiLIFE Commercial',15,15,15,15
+'LabTek chamber slide 8 well','Default',15,15,15,15
