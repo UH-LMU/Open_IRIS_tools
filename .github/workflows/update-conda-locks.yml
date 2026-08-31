@@ -1,0 +1,20 @@
+# .github/workflows/update-conda-locks.yml
+on:
+  push:
+    paths:
+      - 'pixi.lock'
+      - '.github/workflows/update-conda-locks.yml'
+
+jobs:
+  update-conda-locks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pixi-to-conda-lock
+      - run: |
+          mkdir -p conda-locks
+          pixi-to-conda-lock --output conda-locks pixi.lock
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci: update conda-lock files"
+          file_pattern: "conda-locks/*.conda-lock.yml"
