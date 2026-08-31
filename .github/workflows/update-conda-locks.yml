@@ -17,4 +17,4 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "ci: update conda-lock files"
-          file_pattern: "conda-locks/*.conda-lock.yml"
+          file_pattern: "conda-locks/*.yml"
