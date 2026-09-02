@@ -1533,6 +1533,19 @@ package:
     sha256: d85d76827ff732e1639f50f45e4d7d3387a27abd857b194dcbb5bb4166c2a7c2
   category: main
   optional: false
+- name: nbstripout
+  version: 0.9.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    nbformat: '*'
+    python: '>=3.10'
+  url: https://conda.anaconda.org/conda-forge/noarch/nbstripout-0.9.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 948b10290b9f4ebbb26de6da5c6b7c51
+    sha256: e5029a1ca06d5f02c9366ec8686f64c942d77f297bfa90a0a8215083d85a7a01
+  category: main
+  optional: false
 - name: nest-asyncio2
   version: 1.7.2
   manager: conda
@@ -2991,6 +3004,19 @@ package:
   hash:
     md5: 2fbbf92e1173ae024f0b12759c1e64a1
     sha256: d85d76827ff732e1639f50f45e4d7d3387a27abd857b194dcbb5bb4166c2a7c2
+  category: main
+  optional: false
+- name: nbstripout
+  version: 0.9.1
+  manager: conda
+  platform: win-64
+  dependencies:
+    nbformat: '*'
+    python: '>=3.10'
+  url: https://conda.anaconda.org/conda-forge/noarch/nbstripout-0.9.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 948b10290b9f4ebbb26de6da5c6b7c51
+    sha256: e5029a1ca06d5f02c9366ec8686f64c942d77f297bfa90a0a8215083d85a7a01
   category: main
   optional: false
 - name: nest-asyncio2
