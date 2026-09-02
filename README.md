@@ -14,10 +14,9 @@ This repo uses `nbstripout` to strip outputs automatically before they're commit
 it has to be enabled once per clone:
 
 ```
-pixi run nbstripout --install
+pip install nbstripout
+nbstripout --install
 ```
-
-(or, without pixi: `pip install nbstripout && nbstripout --install`)
 
 After that, `git add`/`git commit` will silently strip notebook outputs for you. CI also
 checks for this on every push as a backstop, in case a clone doesn't have it enabled.
