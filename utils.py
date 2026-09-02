@@ -16,11 +16,14 @@ def print_wb(xlsx, max_row=5):
         print(row)
 
         
-def set_type_wbs(df):
-    # Force wbs codes to be int, 0 if missing. This works at LMU but may cause problems at BIU.
-    df['Cost center code'] =  df['Cost center code'].fillna(0)
-    df['Cost center code'] =  df['Cost center code'].astype(int)
-    # Convert WBS codes to string.
+def set_type_wbs(df, wbs_mode='str'):
+    # wbs_mode='int': force WBS codes to be numeric (0 if missing) before converting to string.
+    #   LMU needs this because their controller requires a numeric WBS/cost center code.
+    # wbs_mode='str': just convert to string, allow free text.
+    #   BIU allows non-numeric WBS codes (e.g. with clarifying comments).
+    if wbs_mode == 'int':
+        df['Cost center code'] =  df['Cost center code'].fillna(0)
+        df['Cost center code'] =  df['Cost center code'].astype(int)
     df['Cost center code'] =  df['Cost center code'].astype(str)
     
     
