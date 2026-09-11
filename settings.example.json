@@ -3,6 +3,7 @@
   "PRICE_LIST_DIR": ".",
   "INVOICE_DIR": "./data/BIU/68",
   "INVOICE_NAME": "Invoice68.xlsx",
+  "INVOICE_FIXED": "Invoice68_fixed.xlsx",
   "REQUESTS_NAME": "Biomedicum Imaging Unit-provider-requests.xlsx",
   "INVOICE_BIU_GROUPS": false,
   "INVOICE_LMU_GROUPS": false,

@@ -14,6 +14,8 @@ fixed_*.xlsx
 # Per-machine local paths/filenames for billing_checks_and_fixes.ipynb
 # (see settings.example.json for the template)
 settings.json
+settings_lmu.json
+settings_biu.json
 
 # Jupyter / Python
 .ipynb_checkpoints/
