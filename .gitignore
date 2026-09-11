@@ -11,6 +11,10 @@ fixed_*.xlsx
 *_fixed.xlsx
 *_fixed.csv
 
+# Per-machine local paths/filenames for billing_checks_and_fixes.ipynb
+# (see settings.example.json for the template)
+settings.json
+
 # Jupyter / Python
 .ipynb_checkpoints/
 __pycache__/
