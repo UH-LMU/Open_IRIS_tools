@@ -6,5 +6,7 @@
   "REQUESTS_NAME": "Biomedicum Imaging Unit-provider-requests.xlsx",
   "INVOICE_BIU_GROUPS": false,
   "INVOICE_LMU_GROUPS": false,
-  "WBS_OVERRIDE": null
+  "WBS_OVERRIDE": null,
+  "PROVIDER": "Biomedicum Imaging Unit",
+  "BILLING_CYCLE": "BIU_billing_20260407"
 }
