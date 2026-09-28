@@ -48,7 +48,7 @@ The goal is to replace steps 1–4 with an API integration into the university's
 result must stay the same: each WBS is charged the correct amount, and there is a traceable
 per-line breakdown behind every posting.
 
-## 2. API draft progress and summary of proposals
+## 2. API draft progress and summary of proposals and open issues
 
 These features were added in v8 and v13:
 
@@ -56,18 +56,18 @@ These features were added in v8 and v13:
 - **Charge sign-off (`confirmed_at`).** This replaces the step of splitting a checked invoice into
   per WBS invoice attachments and emailing them.
 
-Key functions:
-- `/charges/{id}/confirmation`, `/charges/confirmations` (provider confirms charge(s))
-- `/charges/{id}/exports`, `/charges/bulk-export` (SAP acknowledges charge(s))
-
 With these, plus `cost_center` on charges and product charges, most of what we need is now in
-the spec. The points below are what remains: 3.1 is outside the API; 3.2 and 3.3 are related to the SAP side,
-3.4 and 3.5 would allow us to replace the current charge confirmation process that relies on creating/deleting/recreating 
-an invoice in OpenIRIS by a new one that queries the API for the charges in the invoicing period.
-Section 4 has some important points to discuss, and section 5 explains the checks we run currently.
-Section 6 has other items found in the spec by Claude.ai.
+the spec. The points below are what remains: 3.1 is outside the API; 3.2 and 3.3 are related to the SAP side.
 
-## 3. Priority items
+Section 4 shows our current understanding of how the billing process would work via the API. 
+This is the part that we should carefully go through with the OpenIRIS team.
+4.3 and 4.4 are requests that would allow us to replace the current charge confirmation 
+process that relies on creating/deleting/recreating 
+an invoice in OpenIRIS by a new one that queries the API for the charges in the invoicing period.
+
+Section 5 explains the checks we run currently. Section 6 has other items found in the spec by Claude.ai.
+
+## 3. Known priority items
 
 ### 3.1 Use provider holidays in pricing
 
@@ -107,32 +107,13 @@ Requests:
 - `Group` has `contact_email` but no group heads/PIs. Please add them (e.g. a `role` on
   `GroupMember`).
 
-### 3.4 Line items in bulk
+## 4. Workflow functions and consistency
 
-`GET /charges/{id}/line-items` is per charge. A quarter for one facility is ~1,500 charges.
-Requests:
+Key functions:
+- `/charges/filter[...]` (provider lists charges of billing period, runs checks)
+- `/charges/{id}/confirmation`, `/charges/confirmations` (provider confirms charge(s) are good-to-go)
+- `/charges/{id}/exports`, `/charges/bulk-export` (SAP acknowledges charge(s))
 
-- Support `expand=line_items` on `GET /charges`, and/or
-- Include line items in `POST /charges/bulk-export` output.
-- Document the possible values of `price_item_code` (regular usage, off-hours, cancellation,
-  training, …).
-
-### 3.5 Filters on charges and bulk export
-
-Please add:
-
-- `filter[period_start]` / `filter[period_end]` (with `gte`/`lt`), to select the charges of a
-  billing period by when the usage happened. Only `created_at`, `updated_at` and
-  `confirmed_at` can be filtered today.
-- `filter[group_id]`, `filter[is_waived]`
-- `filter[status]` with plain `eq` (only `filter[status][in]` is listed)
-- The same filters on `POST /charges/bulk-export`, which today accepts only `from`/`to`/`status`.
-  Most useful for us are provider, period, `confirmed` and `cost_center.provider_code`.
-- `filter[id][in]` on `/users` and `/groups`, so the people and groups behind a set of charges
-  can be fetched in one call instead of one call each (see 5.5).
-
-
-## 4. Lifecycle and consistency
 
 ### 4.1 What happens when a charge changes after sign-off or export?
 
@@ -153,6 +134,31 @@ Please add:
   (charge, external_system, external_id) and not global. Otherwise the second charge gets
   "already recorded" and is silently skipped.
 - There may be need for a bulk acknowledgement endpoint, like `POST /charges/confirmations`.
+
+### 4.3 Line items in bulk
+
+`GET /charges/{id}/line-items` is per charge. A quarter for one facility is ~1,500 charges.
+Requests:
+
+- Support `expand=line_items` on `GET /charges`, and/or
+- Include line items in `POST /charges/bulk-export` output.
+- Document the possible values of `price_item_code` (regular usage, off-hours, cancellation,
+  training, …).
+
+### 4.4 Filters on charges and bulk export
+
+Please add:
+
+- `filter[period_start]` / `filter[period_end]` (with `gte`/`lt`), to select the charges of a
+  billing period by when the usage happened. Only `created_at`, `updated_at` and
+  `confirmed_at` can be filtered today.
+- `filter[group_id]`, `filter[is_waived]`
+- `filter[status]` with plain `eq` (only `filter[status][in]` is listed)
+- The same filters on `POST /charges/bulk-export`, which today accepts only `from`/`to`/`status`.
+  Most useful for us are provider, period, `confirmed` and `cost_center.provider_code`.
+- `filter[id][in]` on `/users` and `/groups`, so the people and groups behind a set of charges
+  can be fetched in one call instead of one call each (see 5.5).
+
 
 
 ## 5. Current checks: can the API support them?
@@ -177,23 +183,23 @@ our facilities (~1,550 lines). "—" means not counted here.
 | `request_id_missing` | Charges not linked to a request | ✅ | `charge.request_id` | 35 rows, 1 group |
 | `group_or_wbs_missing` | Charges with no group or no WBS | ✅ | `charge.group_id`, `charge.cost_center.provider_code` | 0 |
 | `remit_code_missing` | WBS with no remit code (H-code) | 🟡 | `remit_code` is on `/cost-centers`, not on the charge; one lookup per cost center (6.2) | 0 |
-| `cancellation_reasons` | Cancellation charges with a booking comment | 🟡 | `Booking.comments` ✅; identifying a cancellation needs documented `price_item_code` values (3.3) | — |
-| `pi_email_missing` | Groups with no PI email | 🟡 | `Group.contact_email` only; no group heads (3.5) | 77 rows, 1 group |
+| `cancellation_reasons` | Cancellation charges with a booking comment | 🟡 | `Booking.comments` ✅; identifying a cancellation needs documented `price_item_code` values (4.3) | — |
+| `pi_email_missing` | Groups with no PI email | 🟡 | `Group.contact_email` only; no group heads (4.4) | 77 rows, 1 group |
 | `products` | Product purchases, listed for review | 🟡 | `source = product` ✅; product comment and purchase date not exposed | — |
 | `overlapping_bookings` | Overlapping bookings on the same instrument | ✅ | `GET /bookings` with `resource_id`, `start`, `end`, `is_cancelled` | — |
 | `prepaid` | Charges on prepaid requests | 🟡 | Only by matching "prepaid" in `Request.name`; a structured flag would be better | — |
-| `totals_by_group_and_wbs_with_verifiers` | Totals per group, remit code and WBS, with verifier | 🟡 | Totals ✅ by grouping charges; remit code needs a lookup; verifier missing (3.5) | — |
+| `totals_by_group_and_wbs_with_verifiers` | Totals per group, remit code and WBS, with verifier | 🟡 | Totals ✅ by grouping charges; remit code needs a lookup; verifier missing (3.3) | — |
 
 ### 5.2 Supporting checks and listings (debug output)
 
 | Check (output file) | What it finds | API support | How / what is missing |
 |---|---|---|---|
 | `requester_missing` | Charges with no requester (the request owner) | ✅ | `charge.request_id` → `GET /requests/{id}` → `Request.user_id`; one call per request, or `expand` if supported. Request *participants* are not requesters: they share the owner's access and WBS but don't own the request |
-| `verifiers`, `error_multiple_verifiers_per_WBS` | Verifier per WBS, and conflicting answers from request forms | ❌ | Form data not yet implemented; we'd rather have a verifier on the group (3.5) |
-| `cancellations` | All cancellation charges | 🟡 | Needs documented `price_item_code` values (3.3) |
+| `verifiers`, `error_multiple_verifiers_per_WBS` | Verifier per WBS, and conflicting answers from request forms | ❌ | Form data not yet implemented; we'd rather have a verifier on the group (3.3) |
+| `cancellations` | All cancellation charges | 🟡 | Needs documented `price_item_code` values (4.3) |
 | `discount`, `discount_factor` | Charges with a discount | ✅ | `discount_percent`; the reason (charge comment) is not exposed |
 | `waived` | Waived charges | ✅ | `is_waived`, `status = waived` |
-| `trainings` | Training charges | ✅ | `ChargeLineItem.is_training` (line items per charge, 3.3) |
+| `trainings` | Training charges | ✅ | `ChargeLineItem.is_training` (line items per charge, 4.3) |
 | `cost_center_code_int` | WBS code format (numeric at LMU) | ✅ | `cost_center.provider_code` |
 | `totals_by_group_and_wbs_*`, `totals_by_resource_*` | Totals for reconciliation | 🟡 | Grouping by resource needs `booking_id` → booking → `resource_id`; not on Charge directly |
 | Staff and test bookings (`BIU_bookings`, `LMU_bookings`) | Facility staff and test groups/instruments, excluded from billing | ✅ | Filter by `group_id` / `resource_id` |
