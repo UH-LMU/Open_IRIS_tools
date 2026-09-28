@@ -2,10 +2,34 @@
 
 **Spec reviewed:** `openapi-preview.yaml`, preview-v13 (2026-09-22), plus the ERP charge sync recipe and changelog on docs.openiris.io
 **From:** Harri Jäälinoja, Light Microscopy Unit (LMU), HiLIFE, University of Helsinki
-**Draft date:** 2026-09-25
+**Draft date:** 2026-09-28
 
 > **Internal note (delete before sending):** confirm whether this goes out on behalf of LMU only
-> or LMU + BIU. See also the *Open questions for us* section at the end.
+> or LMU + BIU + EMBI. See also the *Open questions for us* section at the end.
+
+
+## 0. Open questions for us at UH (delete before sending)
+
+- Do external and commercial customers really go through a different SAP document type than
+  internal cost recovery? If not, 3.2 drops in priority.
+- What is the maximum length and format of WBS codes at UH, for LMU and for BIU? This would
+  let us give a concrete number in 6.2.
+- HiLIFE HUS: how should it be treated in SAP (same as internal?).
+- Does SAP record a verifier (asiatarkastaja) itself, per WBS or per PI? If so, it may be
+  better synced from SAP than entered in OpenIRIS (section 3.3).
+- Charge and product comments: our notebooks use the charge comment ("Comments
+  (charge)", e.g. why a discount was given) and the product comment and purchase date (who
+  bought a product), but the API doesn't expose them. Does SAP, or the controller, need them
+  in or alongside a posting? If yes, ask OpenIRIS to add them to Charge. Note that night-time
+  rates will be handled as a `discount_percent` agreed with the user, so the reason may matter.
+- Section 5.4: which checks does the SAP side need before a posting?
+- Section 4.2: should SAP get one document per WBS (like today's per-WBS attachments), one
+  per charge, or something else? If it is one per charge, the first bullet of 4.2 can be
+  dropped.
+- `wbs_override.csv`: today we can override a group's WBS locally. With the API, every such
+  override has to be made in OpenIRIS instead. Is that acceptable?
+- Is the €15 minimum-invoice rule and the "prepaid" handling (detected from the request title)
+  something we want OpenIRIS to support, or keep on our side?
 
 ## 1. Background: how we bill today
 
@@ -34,7 +58,7 @@ These features were added in v8 and v13:
 
 With these, plus `cost_center` on charges and product charges, most of what we need is now in
 the spec. The points below are what remains: 3.1 is outside the API; 3.2 and 3.3 are related to the SAP side,
-3.4 annd 3.5 would allow us to replace the current charge confirmation process that relies on creating/deleting/recreating 
+3.4 and 3.5 would allow us to replace the current charge confirmation process that relies on creating/deleting/recreating 
 an invoice in OpenIRIS by a new one that queries the API for the charges in the invoicing period.
 Section 4 has some important points to discuss, and section 5 explains the checks we run currently.
 Section 6 has other items found in the spec by Claude.ai.
@@ -124,12 +148,8 @@ Please add:
   `external_id` is recorded on many charges. Please confirm that the dedup check is per
   (charge, external_system, external_id) and not global. Otherwise the second charge gets
   "already recorded" and is silently skipped.
-- Please add a bulk acknowledgement endpoint, like `POST /charges/confirmations`.
+- There may be need for a bulk acknowledgement endpoint, like `POST /charges/confirmations`.
 
-### 4.3 Invoices
-
-Parking `/invoices` in favour of sign-off (`confirmed_at`) plus export acknowledgements is
-fine for us, as long as charges can be selected by billing period (3.4) and signed off.
 
 ## 5. Current checks: can the API support them?
 
@@ -290,25 +310,3 @@ uses codes with other characters. Requests:
 
 ---
 
-## Open questions for us (delete before sending)
-
-- Do external and commercial customers really go through a different SAP document type than
-  internal cost recovery? If not, 3.2 drops in priority.
-- What is the maximum length and format of WBS codes at UH, for LMU and for BIU? This would
-  let us give a concrete number in 6.2.
-- HiLIFE HUS: how should it be treated in SAP (same as internal?).
-- Does SAP record a verifier (asiatarkastaja) itself, per WBS or per PI? If so, it may be
-  better synced from SAP than entered in OpenIRIS (section 3.5).
-- Discount reasons and product comments: our notebooks use the charge comment ("Comments
-  (charge)", e.g. why a discount was given) and the product comment and purchase date (who
-  bought a product), but the API doesn't expose them. Does SAP, or the controller, need them
-  in or alongside a posting? If yes, ask OpenIRIS to add them to Charge. Note that night-time
-  rates will be handled as a `discount_percent` agreed with the user, so the reason may matter.
-- Section 5.4: which checks does the SAP side need before a posting?
-- Section 4.2: should SAP get one document per WBS (like today's per-WBS attachments), one
-  per charge, or something else? If it is one per charge, the first bullet of 4.2 can be
-  dropped.
-- `wbs_override.csv`: today we can override a group's WBS locally. With the API, every such
-  override has to be made in OpenIRIS instead. Is that acceptable?
-- Is the €15 minimum-invoice rule and the "prepaid" handling (detected from the request title)
-  something we want OpenIRIS to support, or keep on our side?
