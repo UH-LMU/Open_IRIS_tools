@@ -5,7 +5,7 @@
 **Draft date:** 2026-09-28
 
 > **Internal note (delete before sending):** confirm whether this goes out on behalf of LMU only
-> or LMU + BIU + EMBI. See also the *Open questions for us* section at the end.
+> or LMU + BIU + EMBI. See also the *Open questions for us* section below.
 
 
 ## 0. Open questions for us at UH (delete before sending)
@@ -55,6 +55,10 @@ These features were added in v8 and v13:
 - **Cost center sync (`POST`/`PATCH /cost-centers`).** Lets us keep valid WBS codes in step with SAP.
 - **Charge sign-off (`confirmed_at`).** This replaces the step of splitting a checked invoice into
   per WBS invoice attachments and emailing them.
+
+Key functions:
+- `/charges/{id}/confirmation`, `/charges/confirmations` (provider confirms charge(s))
+- `/charges/{id}/exports`, `/charges/bulk-export` (SAP acknowledges charge(s))
 
 With these, plus `cost_center` on charges and product charges, most of what we need is now in
 the spec. The points below are what remains: 3.1 is outside the API; 3.2 and 3.3 are related to the SAP side,
