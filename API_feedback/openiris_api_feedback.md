@@ -10,8 +10,8 @@
 
 ## 0. Open questions for us at UH (delete before sending)
 
-- Do external and commercial customers really go through a different SAP document type than
-  internal cost recovery? If not, 3.2 drops in priority.
+- Q: Do external and commercial customers really go through a different SAP document type than
+  internal cost recovery? If not, 3.2 drops in priority. A: yes, they do.
 - What is the maximum length and format of WBS codes at UH, for LMU and for BIU? This would
   let us give a concrete number in 6.2.
 - HiLIFE HUS: how should it be treated in SAP (same as internal?).
@@ -84,6 +84,12 @@ documents in SAP. Requests:
 - Document the response of `/price-types`, `/price-types/{id}` and `/price-types/{id}/items`
   (currently just `200 OK`).
 
+Internal invoices and external invoices are two separate interfaces.
+Internal invoices are accounting memos, not real invoices. But they still have an approval 
+workflow in SAP, so they go through verification (asiatarkastus) and approval before they are posted to the accounts.
+We just need some piece of data that distinguishes these two datasets. 
+Based on that, the integration routes the data to the different interfaces.
+
 ### 3.3 People: verifiers and contacts
 
 Each posting needs a verifier (in Finnish *asiatarkastaja*): the person who approves the cost
@@ -134,6 +140,13 @@ Key functions:
   (charge, external_system, external_id) and not global. Otherwise the second charge gets
   "already recorded" and is silently skipped.
 - There may be need for a bulk acknowledgement endpoint, like `POST /charges/confirmations`.
+
+An internal invoice can have only one paying WBS per invoice. So the charges should be 
+bundled by paying WBS into one invoice. You could of course send them charge by charge, 
+but wouldn't that get too fragmented?
+
+External invoices should preferably be bundled by customer/reference. By reference 
+I mean the reference you have received from the external customer and that they want to appear on the invoice.
 
 ### 4.3 Line items in bulk
 
@@ -216,10 +229,41 @@ OpenIRIS.
 - `discount_with_split`: a discount on only some of a booking's split lines. This is probably
   moot if `discount_percent` applies to the whole charge; please confirm.
 
-### 5.4 To be added after discussion with SAP
+### 5.4 Required data, minimum
 
-*(Placeholder: checks the SAP side needs, e.g. WBS validity/active status at posting time,
-posting period, GL account mapping.)*
+#### 5.4.1 External invoices
+
+SAP customer ID
+Invoice date
+
+The following can occur n times per invoice:
+
+Product being invoiced, SAP ID (if there is only one product, it can be hard-coded in the integration)
+WBS to which the revenue is posted
+Quantity invoiced (can also be a constant 1, in which case the total price is given as the unit price)
+Unit of measure (can be fixed, e.g. "pcs")
+Unit price (net); SAP calculates the taxes
+Description text for the invoice line (this can be taken from SAP, but it may not be descriptive enough)
+Reference required by the customer
+Some reference number that lets you link the invoice the customer receives to the billing transaction in OpenIRIS. Does the system have a unique invoice number?
+Any additional descriptions needed, either per invoice or per line
+
+#### 5.4.2 Internal invoices
+
+Invoice date
+Header and reference information: profit center / WBS / orderer, the necessary OpenIRIS reference, etc. as description text
+Reference (the sending system's invoice number or similar)
+Invoicing (seller's) profit center
+Customer's profit center
+
+The following can occur n times per invoice:
+
+Invoice line description
+Quantity invoiced (the unit can be sent as a constant, e.g. "pcs")
+Unit price invoiced (excluding tax)
+Invoice line total (quantity × unit price)
+Revenue GL account
+Revenue WBS
 
 ### 5.5 How many API calls would the checks take?
 
