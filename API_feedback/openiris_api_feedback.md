@@ -233,37 +233,37 @@ OpenIRIS.
 
 #### 5.4.1 External invoices
 
-SAP customer ID
-Invoice date
+- SAP customer ID
+- Invoice date
 
 The following can occur n times per invoice:
 
-Product being invoiced, SAP ID (if there is only one product, it can be hard-coded in the integration)
-WBS to which the revenue is posted
-Quantity invoiced (can also be a constant 1, in which case the total price is given as the unit price)
-Unit of measure (can be fixed, e.g. "pcs")
-Unit price (net); SAP calculates the taxes
-Description text for the invoice line (this can be taken from SAP, but it may not be descriptive enough)
-Reference required by the customer
-Some reference number that lets you link the invoice the customer receives to the billing transaction in OpenIRIS. Does the system have a unique invoice number?
-Any additional descriptions needed, either per invoice or per line
+- Product being invoiced, SAP ID (if there is only one product, it can be hard-coded in the integration)
+- WBS to which the revenue is posted
+- Quantity invoiced (can also be a constant 1, in which case the total price is given as the unit price)
+- Unit of measure (can be fixed, e.g. "pcs")
+- Unit price (net); SAP calculates the taxes
+- Description text for the invoice line (this can be taken from SAP, but it may not be descriptive enough)
+- Reference required by the customer
+- Some reference number that lets you link the invoice the customer receives to the billing transaction in OpenIRIS. Does the system have a unique invoice number?
+- Any additional descriptions needed, either per invoice or per line
 
 #### 5.4.2 Internal invoices
 
-Invoice date
-Header and reference information: profit center / WBS / orderer, the necessary OpenIRIS reference, etc. as description text
-Reference (the sending system's invoice number or similar)
-Invoicing (seller's) profit center
-Customer's profit center
+- Invoice date
+- Header and reference information: profit center / WBS / orderer, the necessary OpenIRIS reference, etc. as description text
+- Reference (the sending system's invoice number or similar)
+- Invoicing (seller's) profit center
+- Customer's profit center
 
 The following can occur n times per invoice:
 
-Invoice line description
-Quantity invoiced (the unit can be sent as a constant, e.g. "pcs")
-Unit price invoiced (excluding tax)
-Invoice line total (quantity × unit price)
-Revenue GL account
-Revenue WBS
+- Invoice line description
+- Quantity invoiced (the unit can be sent as a constant, e.g. "pcs")
+- Unit price invoiced (excluding tax)
+- Invoice line total (quantity × unit price)
+- Revenue GL account
+- Revenue WBS
 
 ### 5.5 How many API calls would the checks take?
 
