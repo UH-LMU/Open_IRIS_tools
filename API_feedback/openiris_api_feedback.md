@@ -101,6 +101,7 @@ Requests:
   maintained by the group or by facility staff in the UI. It should be readable from
   `GET /groups/{id}` and embedded on charges, or at least reachable in one step from
   `charge.group_id`.
+- Add user role *verifier* that allows to check and verify charges.
 - As a fallback, the request owner (`Request.user_id`, via `charge.request_id`) already covers
   what we do today. `GET /requests/{id}/form-submission` / `FormSubmission.data` would still be useful
   for other form fields, but is not the right long-term home for the verifier.
