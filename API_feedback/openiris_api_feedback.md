@@ -48,7 +48,8 @@ These features were added in v8 and v13:
 - **Charge sign-off (`confirmed_at`).** This is a starting point, invoices can be built from confirmed charges.
 
 The points below are what remains: 3.1 is outside the API; 3.2 and 3.3 are related to the SAP side.
-3.4. and 3.5 were added after a meeting with Julia where it was concluded that the way forward is via the /invoice endpoint.
+3.4. and 3.5 were added after a meeting with Julia where it was concluded that the way forward is via 
+the `/invoice` endpoint.
 
 Section 4 shows our current understanding of how the billing process would work via the API. 
 This is the part that we should carefully go through with the OpenIRIS team.
@@ -102,7 +103,7 @@ Requests:
   maintained by the group or by facility staff in the UI. It should be readable from
   `GET /groups/{id}` and embedded on charges, or at least reachable in one step from
   `charge.group_id`.
-- Add user role *verifier* that allows to check and verify charges.
+- Add user role **verifier** that allows to check and verify charges.
 - As a fallback, the request owner (`Request.user_id`, via `charge.request_id`) already covers
   what we do today. `GET /requests/{id}/form-submission` / `FormSubmission.data` would still be useful
   for other form fields, but is not the right long-term home for the verifier.
@@ -120,12 +121,12 @@ It was proposed that WBSs continue to be imported manually in Iris, but an API e
 to get the list of WBSs and the set the validity parameters. This allows SAP integration to synchronize the
 status of the WBSs known to Iris.
 
-### 3.5 Improve /invoice endpoint
+### 3.5 Improve `/invoice` endpoint
 
 Recording individual charges in SAP is not feasible, we should record totals as we've done so far.
-Using the /charges endpoint would mean that we would have to build the logic of combining charges 
+Using the `/charges` endpoint would mean that we would have to build the logic of combining charges 
 somewhere. UH integration does not do logic, and building it by providers would be cludgy, so the best 
-way forward is to improve the /invoice endpoint of the API.
+way forward is to improve the `/invoice` endpoint of the API.
 
 These are the minimum required data for SAP:
 
@@ -170,10 +171,10 @@ Key functions:
 - `/charges/filter[...]` (provider lists charges of billing period, runs checks)
 - `/charges/{id}/confirmation`, `/charges/confirmations` (provider confirms charge(s) are good-to-go)
 
-*TODO: add /invoice endpoint calls* 
+*TODO: add `/invoice` endpoint calls* 
 - invoice is created in OpenIRIS
 - invoice is marked good-to-go
-- integration reads /invoice
+- integration reads `/invoice`
 - SAP gets invoice
 - invoice is marked as exported to SAP
 
