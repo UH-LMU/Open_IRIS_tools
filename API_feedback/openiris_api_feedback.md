@@ -45,11 +45,10 @@ per-line breakdown behind every posting.
 These features were added in v8 and v13:
 
 - **Cost center sync (`POST`/`PATCH /cost-centers`).** Lets us keep valid WBS codes in step with SAP.
-- **Charge sign-off (`confirmed_at`).** This replaces the step of splitting a checked invoice into
-  per WBS invoice attachments and emailing them.
+- **Charge sign-off (`confirmed_at`).** This is a starting point, invoices can be built from confirmed charges.
 
-With these, plus `cost_center` on charges and product charges, most of what we need is now in
-the spec. The points below are what remains: 3.1 is outside the API; 3.2 and 3.3 are related to the SAP side.
+The points below are what remains: 3.1 is outside the API; 3.2 and 3.3 are related to the SAP side.
+3.4. and 3.5 were added after a meeting with Julia where it was concluded that the way forward is via the /invoice endpoint.
 
 Section 4 shows our current understanding of how the billing process would work via the API. 
 This is the part that we should carefully go through with the OpenIRIS team.
@@ -65,7 +64,9 @@ Section 5 explains the checks we run currently. Section 6 has other items found 
 
 OpenIRIS UI allows provider admins to select holidays, but to our knowledge these holidays are not used when making pricing decisions. Our policy is to apply off-hours prices on national holidays, and currently we need to apply this outside OpenIRIS. This item is not directly related to the API, but has bearing on how we can correct the charges in OpenIRIS prior to a billing run.
 
-*Agreed with Julia 2026-10-07*
+*Agreed with Julia 2026-10-07*:
+- provider admin marks provider holidays (existing feature)
+- add checkbox "include public holidays" in Off-hours price item
 
 ### 3.2 Price type on the charge
 
