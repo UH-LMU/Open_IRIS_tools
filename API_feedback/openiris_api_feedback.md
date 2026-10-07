@@ -10,22 +10,14 @@
 
 ## 0. Open questions for us at UH (delete before sending)
 
-- Q: Do external and commercial customers really go through a different SAP document type than
-  internal cost recovery? If not, 3.2 drops in priority. A: yes, they do.
 - What is the maximum length and format of WBS codes at UH, for LMU and for BIU? This would
   let us give a concrete number in 6.2.
 - HiLIFE HUS: how should it be treated in SAP (same as internal?).
-- Does SAP record a verifier (asiatarkastaja) itself, per WBS or per PI? If so, it may be
-  better synced from SAP than entered in OpenIRIS (section 3.3).
 - Charge and product comments: our notebooks use the charge comment ("Comments
   (charge)", e.g. why a discount was given) and the product comment and purchase date (who
   bought a product), but the API doesn't expose them. Does SAP, or the controller, need them
   in or alongside a posting? If yes, ask OpenIRIS to add them to Charge. Note that night-time
   rates will be handled as a `discount_percent` agreed with the user, so the reason may matter.
-- Section 5.4: which checks does the SAP side need before a posting?
-- Section 4.2: should SAP get one document per WBS (like today's per-WBS attachments), one
-  per charge, or something else? If it is one per charge, the first bullet of 4.2 can be
-  dropped.
 - `wbs_override.csv`: today we can override a group's WBS locally. With the API, every such
   override has to be made in OpenIRIS instead. Is that acceptable?
 - Is the €15 minimum-invoice rule and the "prepaid" handling (detected from the request title)
@@ -73,6 +65,8 @@ Section 5 explains the checks we run currently. Section 6 has other items found 
 
 OpenIRIS UI allows provider admins to select holidays, but to our knowledge these holidays are not used when making pricing decisions. Our policy is to apply off-hours prices on national holidays, and currently we need to apply this outside OpenIRIS. This item is not directly related to the API, but has bearing on how we can correct the charges in OpenIRIS prior to a billing run.
 
+*Agreed with Julia 2026-10-07*
+
 ### 3.2 Price type on the charge
 
 Neither `Charge` nor `ChargeLineItem` says which price type (e.g. *HiLIFE internal*,
@@ -113,13 +107,80 @@ Requests:
 - `Group` has `contact_email` but no group heads/PIs. Please add them (e.g. a `role` on
   `GroupMember`).
 
+### 3.4 Improve cost centers (WBS)
+
+Cost centers should have 
+- start date
+- end date
+- validity (is_active)
+
+It was proposed that WBSs continue to be imported manually in Iris, but an API endpoint is added that allows
+to get the list of WBSs and the set the validity parameters. This allows SAP integration to synchronize the
+status of the WBSs known to Iris.
+
+### 3.5 Improve /invoice endpoint
+
+Recording individual charges in SAP is not feasible, we should record totals as we've done so far.
+Using the /charges endpoint would mean that we would have to build the logic of combining charges 
+somewhere. UH integration does not do logic, and building it by providers would be cludgy, so the best 
+way forward is to improve the /invoice endpoint of the API.
+
+These are the minimum required data for SAP:
+
+*External invoices*
+
+- SAP customer ID
+- Invoice date
+
+The following can occur n times per invoice:
+
+- Product being invoiced, SAP ID (if there is only one product, it can be hard-coded in the integration)
+- WBS to which the revenue is posted
+- Quantity invoiced (can also be a constant 1, in which case the total price is given as the unit price)
+- Unit of measure (can be fixed, e.g. "pcs")
+- Unit price (net); SAP calculates the taxes
+- Description text for the invoice line (this can be taken from SAP, but it may not be descriptive enough)
+- Reference required by the customer
+- Some reference number that lets you link the invoice the customer receives to the billing transaction in OpenIRIS. Does the system have a unique invoice number?
+- Any additional descriptions needed, either per invoice or per line
+
+*Internal invoices*
+
+- Invoice date
+- Header and reference information: profit center / WBS / orderer, the necessary OpenIRIS reference, etc. as description text
+- Reference (the sending system's invoice number or similar)
+- Invoicing (seller's) profit center
+- Customer's profit center
+
+The following can occur n times per invoice:
+
+- Invoice line description
+- Quantity invoiced (the unit can be sent as a constant, e.g. "pcs")
+- Unit price invoiced (excluding tax)
+- Invoice line total (quantity × unit price)
+- Revenue GL account
+- Revenue WBS
+
+
 ## 4. Workflow functions and consistency
 
 Key functions:
 - `/charges/filter[...]` (provider lists charges of billing period, runs checks)
 - `/charges/{id}/confirmation`, `/charges/confirmations` (provider confirms charge(s) are good-to-go)
-- `/charges/{id}/exports`, `/charges/bulk-export` (SAP acknowledges charge(s))
 
+*TODO: add /invoice endpoint calls* 
+- invoice is created in OpenIRIS
+- invoice is marked good-to-go
+- integration reads /invoice
+- SAP gets invoice
+- invoice is marked as exported to SAP
+
+An internal invoice can have only one paying WBS per invoice. So the charges should be 
+bundled by paying WBS into one invoice. You could of course send them charge by charge, 
+but wouldn't that get too fragmented?
+
+External invoices should preferably be bundled by customer/reference. By reference 
+I mean the reference you have received from the external customer and that they want to appear on the invoice.
 
 ### 4.1 What happens when a charge changes after sign-off or export?
 
@@ -133,20 +194,6 @@ Key functions:
   `charge.recalculated`, `charge.confirmation_withdrawn` and `charge.exported`.
 - Add `confirmed_by` (user or key) to the confirmation, for audit.
 
-### 4.2 Export acknowledgements
-
-- If one SAP document covers many charges (for example one document per WBS), the same
-  `external_id` is recorded on many charges. Please confirm that the dedup check is per
-  (charge, external_system, external_id) and not global. Otherwise the second charge gets
-  "already recorded" and is silently skipped.
-- There may be need for a bulk acknowledgement endpoint, like `POST /charges/confirmations`.
-
-An internal invoice can have only one paying WBS per invoice. So the charges should be 
-bundled by paying WBS into one invoice. You could of course send them charge by charge, 
-but wouldn't that get too fragmented?
-
-External invoices should preferably be bundled by customer/reference. By reference 
-I mean the reference you have received from the external customer and that they want to appear on the invoice.
 
 ### 4.3 Line items in bulk
 
@@ -229,41 +276,6 @@ OpenIRIS.
 - `discount_with_split`: a discount on only some of a booking's split lines. This is probably
   moot if `discount_percent` applies to the whole charge; please confirm.
 
-### 5.4 Required data, minimum
-
-#### 5.4.1 External invoices
-
-- SAP customer ID
-- Invoice date
-
-The following can occur n times per invoice:
-
-- Product being invoiced, SAP ID (if there is only one product, it can be hard-coded in the integration)
-- WBS to which the revenue is posted
-- Quantity invoiced (can also be a constant 1, in which case the total price is given as the unit price)
-- Unit of measure (can be fixed, e.g. "pcs")
-- Unit price (net); SAP calculates the taxes
-- Description text for the invoice line (this can be taken from SAP, but it may not be descriptive enough)
-- Reference required by the customer
-- Some reference number that lets you link the invoice the customer receives to the billing transaction in OpenIRIS. Does the system have a unique invoice number?
-- Any additional descriptions needed, either per invoice or per line
-
-#### 5.4.2 Internal invoices
-
-- Invoice date
-- Header and reference information: profit center / WBS / orderer, the necessary OpenIRIS reference, etc. as description text
-- Reference (the sending system's invoice number or similar)
-- Invoicing (seller's) profit center
-- Customer's profit center
-
-The following can occur n times per invoice:
-
-- Invoice line description
-- Quantity invoiced (the unit can be sent as a constant, e.g. "pcs")
-- Unit price invoiced (excluding tax)
-- Invoice line total (quantity × unit price)
-- Revenue GL account
-- Revenue WBS
 
 ### 5.5 How many API calls would the checks take?
 
