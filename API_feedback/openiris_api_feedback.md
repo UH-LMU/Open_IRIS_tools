@@ -68,6 +68,7 @@ OpenIRIS UI allows provider admins to select holidays, but to our knowledge thes
 *Agreed with Julia 2026-10-07*:
 - provider admin marks provider holidays (existing feature)
 - add checkbox "include public holidays" in Off-hours price item
+- Show public holidays on Calendar similarly as weekends
 
 ### 3.2 Price type on the charge
 
@@ -130,23 +131,6 @@ way forward is to improve the `/invoice` endpoint of the API.
 
 These are the minimum required data for SAP:
 
-*External invoices*
-
-- SAP customer ID
-- Invoice date
-
-The following can occur n times per invoice:
-
-- Product being invoiced, SAP ID (if there is only one product, it can be hard-coded in the integration)
-- WBS to which the revenue is posted
-- Quantity invoiced (can also be a constant 1, in which case the total price is given as the unit price)
-- Unit of measure (can be fixed, e.g. "pcs")
-- Unit price (net); SAP calculates the taxes
-- Description text for the invoice line (this can be taken from SAP, but it may not be descriptive enough)
-- Reference required by the customer
-- Some reference number that lets you link the invoice the customer receives to the billing transaction in OpenIRIS. Does the system have a unique invoice number?
-- Any additional descriptions needed, either per invoice or per line
-
 *Internal invoices*
 
 - Invoice date
@@ -164,6 +148,24 @@ The following can occur n times per invoice:
 - Revenue GL account
 - Revenue WBS
 
+*External invoices*
+
+- SAP customer ID
+- Invoice date
+
+The following can occur n times per invoice:
+
+- Product being invoiced, SAP ID (if there is only one product, it can be hard-coded in the integration)
+- WBS to which the revenue is posted
+- Quantity invoiced (can also be a constant 1, in which case the total price is given as the unit price)
+- Unit of measure (can be fixed, e.g. "pcs")
+- Unit price (net); SAP calculates the taxes
+- Description text for the invoice line (this can be taken from SAP, but it may not be descriptive enough)
+- Reference required by the customer
+- Some reference number that lets you link the invoice the customer receives to the billing transaction in OpenIRIS. Does the system have a unique invoice number?
+- Any additional descriptions needed, either per invoice or per line
+
+External invoices needs more discussion. It can be implemented later as long as integration can use Price Type (#3.2) as a tag to leave external charges in OpenIRIS for manual handling by UH form system similar way as this moment.
 
 ## 4. Workflow functions and consistency
 
