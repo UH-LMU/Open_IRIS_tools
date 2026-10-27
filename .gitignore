@@ -1,0 +1,23 @@
+# Real booking/invoice data and run outputs (contains names, emails, WBS codes)
+data/
+Data/
+Data_after_fix/
+debug/
+tmp_*.xlsx
+test_*.xlsx
+fixed_*.xlsx
+*__with_owners.xlsx
+*__header.xlsx
+*_fixed.xlsx
+*_fixed.csv
+
+# Per-machine local paths/filenames for billing_checks_and_fixes.ipynb
+# (see settings.example.json for the template)
+settings.json
+settings_lmu.json
+settings_biu.json
+
+# Jupyter / Python
+.ipynb_checkpoints/
+__pycache__/
+*.pyc

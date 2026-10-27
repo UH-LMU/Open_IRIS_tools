@@ -1,0 +1,3904 @@
+openapi: 3.1.0
+
+info:
+  title: OpenIRIS Public API
+  version: preview-v13
+  summary: REST API for institutional integration with OpenIRIS — preview specification
+  description: |
+    > **PROPOSAL with live parts.** Tag groups marked ✅ IMPLEMENTED are built and running on the
+    > Test and Staging environments; their exact contract is the generated reference. Everything
+    > else is open for review and may change based on feedback. `https://api.openiris.io/v1/…` is
+    > the production URL once the production release ships. See the [overview page](index.html).
+
+    OpenIRIS is a resource booking / reservation management platform for research institutions.
+    This API exposes OpenIRIS data to **provider institutions integrating their own systems** —
+    billing exports to ERP, custom workflows, and electronic lab notebook integrations.
+
+    ## Use cases
+
+    - **Billing → ERP sync** — charges pulled and posted as Journal Entries into SAP, Oracle Fusion,
+      NetSuite, Workday, etc. This is the priority-1 surface (see `/charges`).
+    - **Custom workflows** — approval automation, dashboards, admin tooling built on the booking
+      and request data.
+    - **ELN / lab-software integration** — Benchling, Labguru, elabftw attaching experiment records
+      to bookings and resources via `external_reference` round-trip.
+
+    ## Conventions
+
+    - **snake_case** JSON, ISO-8601 UTC timestamps (with `*_local` variants where fiscal-period
+      matters), ISO 4217 currency codes.
+    - **Cursor pagination** — collections return `{ data, meta, links }`. Navigate with `cursor_next` /
+      `cursor_prev` tokens or the `links.next` / `links.prev` URLs.
+    - **Rich filtering** — `filter[field][op]=value` (operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`,
+      `in`, `contains`, `starts_with`, `ends_with`). Safelisted per field.
+    - **Multi-key sorting** — `sort=-created_at,name` (`-` prefix = descending).
+    - **Sparse fieldsets** — `fields[booking]=id,start,end`.
+    - **Nested expansion** — `expand=resource,user` nests related objects inline as
+      `embeds.{relation}.data`.
+    - **Errors** — RFC 9457 `application/problem+json` with `code`, `trace_id`, `type` URI.
+    - **Idempotency** — `Idempotency-Key` header required on `POST`/`PATCH`/non-cancel `DELETE`.
+      Stored 24 h, replays return the cached response.
+    - **Optimistic concurrency** — `ETag` on single-resource reads; `If-Match` required on `PATCH`.
+    - **Rate limits** — per-key fixed window, default 600 req/min. Headers: `RateLimit-Limit`,
+      `RateLimit-Remaining`, `RateLimit-Reset`, `Retry-After` on 429.
+
+    ## Scopes
+
+    API keys carry one or more scopes. A request failing the scope check returns 403 with
+    `code: "forbidden"`.
+
+    | Scope | Grants |
+    |---|---|
+    | `billing:read` | charges, invoices, cost-centers, price-types, billing-quotes, group-orders |
+    | `billing:write` | *(new in v10)* confirm/withdraw charge sign-off (`/charges/{id}/confirmation`, `/charges/confirmations`) |
+    | `bookings:read` | bookings, booking-series, misuse-records, calendar feeds |
+    | `bookings:write` | create/update/cancel bookings & series, booking attachments |
+    | `resources:read` | resources, availability, addons, forms, statistics, search |
+    | `resources:write` | *(new in v8)* provision resource stubs from asset-management systems, archive on disposal |
+    | `requests:read` | requests and sub-resources, including the people on a request (`/requests/{id}/participants`) |
+    | `requests:write` | create/update/transition requests |
+    | `users:read` | provider-scoped users, groups, organizations, projects, issues |
+    | `groups:write` | *(new in v8)* add/remove group members |
+    | `projects:write` | *(new in v8)* create projects, manage project members |
+    | `cost-centers:write` | *(new in v8)* create/inactivate cost centers (ERP code sync) |
+    | `webhooks:manage` | webhooks, events catalogue |
+
+    The four `*:write` provisioning scopes added in preview-v8 are deliberately separate from the
+    end-user scopes (`bookings:write`, `requests:write`) — an ERP read key cannot provision, and a
+    directory-sync key cannot touch bookings.
+
+    ## What's new in preview-v13 (contracts proposal v10)
+
+    Built from the member use cases collected in the Public API project plan (September 2026).
+    Every change is additive.
+
+    - **Users lookup** (shipped): `GET /users?filter[email]=` resolves an institutional identity to
+      the `user_id` the membership writes take — the missing step for directory sync.
+    - **Providers and resource types** (shipped): `GET /providers`, `GET /resource-types` — the
+      facility and taxonomy half of the directory a chatbot or ELN renders.
+    - **Resource provisioning and archiving** (shipped): `POST /resources` creates an offline,
+      user-invisible stub; `POST /resources/{id}/transitions { to: archived }` ends bookability.
+      `resource_type_id` is required on provisioning.
+    - **Bookings read** (shipped) with `status`, `kind`, `end` and `external_reference` filters, and
+      `PATCH /bookings/{id}` for the integrator-owned fields (`external_reference`, `comments`).
+    - **Door-access check** (shipped): `GET /resources/{id}/current-booking?user_id=` answers
+      whether a user holds a valid booking right now, personally or through a group.
+    - **Usage entries** (shipped): `POST /bookings { kind: usage }` records a completed measurement
+      as a booking entirely in the past. Reservations in advance (`kind: booking`) are the next
+      increment.
+    - **Projects** (shipped): create with members by email, list, members add/remove.
+    - **Cost center on charges** (shipped): every charge carries `cost_center` — the provider code
+      (SAP WBS) plus any group, organization or user code — resolved from its booking or request,
+      with `filter[cost_center.provider_code]`. This is what a per-cost-center split or an ERP
+      posting needs.
+    - **Charge batches** removed — superseded by charge confirmation (`confirmed_at`).
+    - **Invoices** parked: charge confirmation plus export acknowledgements cover the vetted-charges
+      workflow; the document surface returns only if a member still needs it.
+    - **SCIM**: not in v1. See the contracts proposal §6.24 for where identity provisioning terminates.
+
+    ## What's new in preview-v8
+
+    Every change below is **additive** and comes directly from feedback on this forum — thank you.
+
+    - **Cost-center sync** (target v1): `POST /cost-centers`, `PATCH /cost-centers/{id}` to
+      inactivate, `filter[code]` for nightly diff jobs.
+    - **Group membership administration** (target v1): `POST /groups/{id}/members`,
+      `DELETE /groups/{id}/members/{user_id}`. Declarative replace-all (`PUT`) was considered and
+      rejected — a sync bug would empty a group that drives access and billing.
+    - **Project creation** (proposed v1.1): `POST /projects` with members resolved by email.
+      Silent user auto-creation was rejected (duplicate-account risk); unresolved emails are
+      returned as `unmatched_emails` for manual handling.
+    - **Resource provisioning** (proposed v1.1): `POST /resources` creates a non-bookable draft stub
+      from asset-management master data; `POST /resources/{id}/transitions` archives on disposal.
+      Configuration and enrichment stay in the OpenIRIS UI. `external_reference` added to resources.
+    - **Charge batches** (design proposal — feedback wanted): a period-close resource answering
+      "how do we signal a set of charges is vetted and ready for export?" without forcing the
+      invoice model onto institutions that don't use it. See the *Charge batches* section.
+
+    ## Feedback
+
+    Collected on the dedicated UserVoice forum at
+    [openiris.uservoice.com/forums/967624-public-api-feedback](https://openiris.uservoice.com/forums/967624-public-api-feedback) — anonymous
+    posts are welcome, no account needed.
+  contact:
+    name: OpenIRIS Public API feedback
+    url: https://openiris.uservoice.com/forums/967624-public-api-feedback
+    email: api-preview@openiris.io
+  license:
+    name: Preview — all rights reserved, no SLA
+    identifier: LicenseRef-OpenIRIS-Preview
+  x-logo:
+    altText: OpenIRIS
+
+servers:
+  - url: https://api.openiris.io/v1
+    description: Future production URL (not yet live)
+
+security:
+  - ApiKey: []
+
+tags:
+  - name: Meta
+    description: API discovery, spec, and per-caller status.
+  - name: Charges
+    description: |
+      ✅ **IMPLEMENTED — reads, line items, and export acknowledgements are live on the v1 branch.**
+
+      Consolidated charges for billing / ERP export. Unifies three polymorphic DB tables (booking,
+      request, product charges) behind one resource with a `source` discriminator. **Primary ERP
+      integration surface** — charges map to SAP Journal Entry Post (and equivalent in Oracle,
+      NetSuite, Workday).
+  - name: Invoices
+    description: |
+      **Parked (preview-v13).** Charge confirmation (`confirmed_at`) plus export acknowledgements
+      cover the vetted-charges workflow that motivated this surface; it returns to the plan only if
+      a member still needs the document representation. Would also need schema additions
+      (see proposal §9). **preview-v8 correction:** an invoice may span *many* cost centers
+      (real installations invoice all groups quarterly in one document) — the earlier 1:1
+      invoice→cost-center shape was wrong and has been removed. Per-cost-center splits are a
+      rendering concern over `/invoices/{id}/charges`.
+  - name: Bookings
+    description: |
+      ✅ **IMPLEMENTED — reads, usage entries (`kind: usage`), the door-access check and the
+      `external_reference` / `comments` patch are live on the v1 branch (reservations in advance,
+      series, cancel and the sub-collections still proposed).**
+
+      Reservations against resources — the core domain entity.
+  - name: Booking series
+    description: Recurring booking templates. Expand to N individual bookings.
+  - name: Resources
+    description: |
+      ✅ **IMPLEMENTED — reads, provisioning, the archive transition and the current-booking check
+      are live on the v1 branch.**
+
+      Equipment, facilities, and services that can be booked.
+  - name: Providers
+    description: |
+      ✅ **IMPLEMENTED — live on the v1 branch.**
+
+      The facilities (cores) a key is scoped to — exactly its resolved provider set.
+  - name: Resource types
+    description: |
+      ✅ **IMPLEMENTED — live on the v1 branch.**
+
+      The taxonomy behind `resource_type_id`: the types in use by the key's providers, with parents.
+  - name: Requests
+    description: |
+      ✅ **IMPLEMENTED — reads and the participants collection are live on the v1 branch
+      (create / transition and the other sub-collections still proposed).**
+
+      Service requests — what most facilities call projects — with a lifecycle
+      (pending → active → reviewed / closed / discontinued). Training requests are a
+      separate table and are not in this collection yet.
+  - name: Calendar feeds
+    description: iCalendar feeds for personal / resource / provider calendars.
+  - name: Forms
+    description: Custom form templates and their submissions.
+  - name: Attachments
+    description: File uploads attached to bookings, requests, and other entities.
+  - name: Issues
+    description: Equipment incident reports (separate from service requests).
+  - name: Misuse records
+    description: Penalty points for booking policy violations.
+  - name: Users
+    description: |
+      ✅ **IMPLEMENTED — reads with `filter[email]` are live on the v1 branch.**
+
+      Users of organizations trusted by the key's providers — the email → `user_id` lookup a
+      directory sync needs before the membership writes.
+  - name: Groups
+    description: |
+      ✅ **IMPLEMENTED — reads and member add/remove are live on the v1 branch.**
+
+      Groups / teams within organizations.
+  - name: Organizations
+    description: Institutions / tenants.
+  - name: Projects
+    description: |
+      ✅ **IMPLEMENTED — reads, create (members by email) and member add/remove are live on the
+      v1 branch.**
+
+      Organization-owned grants or experiments with direct members. Distinct from service
+      requests, which are provider-owned work.
+  - name: Cost centers
+    description: |
+      ✅ **IMPLEMENTED — reads, create, and inactivate are live on the v1 branch.**
+
+      Provider-side billing accounts.
+  - name: Price types
+    description: Pricing templates.
+  - name: Billing quotes
+    description: Price estimates.
+  - name: Group orders
+    description: Purchasing workflow.
+  - name: Statistics
+    description: Usage, utilization, heatmap aggregations.
+  - name: Notifications
+    description: System-wide banner messages.
+  - name: Webhooks
+    description: Event subscriptions — delivery, signing, activity log, retry.
+  - name: Events
+    description: Catalogue of event types fired over webhooks.
+  - name: Search
+    description: Federated full-text search across resource types.
+  - name: Async tasks
+    description: Polling interface for long-running operations.
+
+x-tagGroups:
+  - name: Getting started
+    tags: [Meta]
+  - name: Billing & ERP
+    tags: [Charges, Invoices, Cost centers, Price types, Billing quotes, Group orders]
+  - name: Bookings & resources
+    tags: [Bookings, Booking series, Resources, Providers, Resource types, Calendar feeds, Forms, Attachments]
+  - name: Requests & workflows
+    tags: [Requests, Issues, Misuse records]
+  - name: Directory
+    tags: [Users, Groups, Organizations, Projects]
+  - name: Events & automation
+    tags: [Webhooks, Events, Async tasks]
+  - name: Reporting
+    tags: [Statistics, Notifications, Search]
+
+paths:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # META
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /ping:
+    get:
+      tags: [Meta]
+      summary: Verify the API key is accepted
+      description: |
+        Returns the authenticated key's resolved provider IDs and scopes. Useful as a first call
+        after provisioning a key — confirms the key parses, is not revoked, and covers the expected
+        providers. No scope required beyond authentication.
+      operationId: getPing
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PingResponse' }
+              example:
+                status: ok
+                provider_ids: [1, 2, 5]
+                scopes: [billing:read, bookings:read, webhooks:manage]
+                server_time: 2026-04-18T12:30:00Z
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /meta/scopes:
+    get:
+      tags: [Meta]
+      summary: List all scope definitions
+      operationId: getMetaScopes
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string, example: billing:read }
+                        description: { type: string }
+                        grants: { type: array, items: { type: string }, description: Endpoints covered }
+
+  /meta/status:
+    get:
+      tags: [Meta]
+      summary: Per-caller status and rate-limit defaults
+      operationId: getMetaStatus
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server_time: { type: string, format: date-time }
+                  key_id: { type: string }
+                  provider_ids: { type: array, items: { type: integer } }
+                  scopes: { type: array, items: { type: string } }
+                  rate_limit:
+                    type: object
+                    properties:
+                      per_minute: { type: integer, example: 600 }
+                      remaining: { type: integer }
+                      reset_seconds: { type: integer }
+
+  /meta/schemas:
+    get:
+      tags: [Meta]
+      summary: Discover resource schemas
+      operationId: getMetaSchemas
+      description: Returns JSON Schema for every public resource. Enables dynamic UI generation.
+      responses:
+        '200':
+          description: OK
+
+  /openapi.json:
+    get:
+      tags: [Meta]
+      summary: OpenAPI 3.1 spec of the live API
+      description: |
+        **Preview note:** today serves this preview document. Once the API is implemented, this
+        endpoint returns the auto-generated spec describing *live* endpoints only.
+      operationId: getOpenApiSpec
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # CHARGES — priority-1, fully specified
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /charges:
+    get:
+      tags: [Charges]
+      summary: List charges
+      description: |
+        The primary ERP-sync endpoint. Cursor-paginated, richly filterable by date, status, cost
+        center, source. For ERP integrators: use `filter[created_at][gte]=` as the delta-sync cursor
+        (or `filter[updated_at][gte]=` once the P0 backfill is in place) and
+        `filter[status]=unbilled&filter[confirmed]=true` for the ready-to-bill queue — `confirmed_at`
+        is the sign-off, not `status=invoiced`. Use `POST /charges/{id}/exports` to mark a charge as posted to your
+        external system — this is how you achieve idempotency since SAP Journal Entry Post has no
+        native duplicate check.
+      operationId: listCharges
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Expand'
+        - name: 'filter[created_at][gte]'
+          in: query
+          schema: { type: string, format: date-time }
+        - name: 'filter[created_at][lt]'
+          in: query
+          schema: { type: string, format: date-time }
+        - name: 'filter[status][in]'
+          in: query
+          schema: { type: string, example: invoiced,exported }
+        - name: 'filter[source]'
+          in: query
+          schema: { $ref: '#/components/schemas/ChargeSource' }
+        - name: 'filter[provider_id]'
+          in: query
+          schema: { type: string, description: 'Comma-separated provider IDs. Omit to include all the key''s providers.' }
+        - name: 'filter[cost_center.provider_code]'
+          in: query
+          schema: { type: string, description: 'Shipped (preview-v13): the ERP posting code resolved from the booking or request; also filter[cost_center.provider_code][in]=A,B' }
+        - name: 'filter[currency]'
+          in: query
+          schema: { type: string, example: EUR }
+        - name: 'filter[confirmed]'
+          in: query
+          schema: { type: boolean, description: 'Signed off as ready to bill. Combine with filter[status]=unbilled for the ready-to-bill queue.' }
+        - name: 'filter[confirmed_at][gte]'
+          in: query
+          schema: { type: string, format: date-time, description: 'Delta cursor for what has been signed off since your last pull.' }
+        - name: 'filter[updated_at][gte]'
+          in: query
+          schema: { type: string, format: date-time, description: 'Delta cursor on the charge row itself (rows with a NULL updated_at are excluded).' }
+        - name: 'filter[updated_at][lt]'
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          headers:
+            X-Total-Records: { $ref: '#/components/headers/XTotalRecords' }
+            RateLimit-Limit: { $ref: '#/components/headers/RateLimitLimit' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Charge' } }
+              examples:
+                charges-list:
+                  $ref: '#/components/examples/ChargesList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /charges/{id}:
+    get:
+      tags: [Charges]
+      summary: Fetch a single charge
+      operationId: getCharge
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Expand'
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Charge' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /charges/{id}/line-items:
+    get:
+      tags: [Charges]
+      summary: List line items for a consolidated charge
+      operationId: getChargeLineItems
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/ChargeLineItem' } }
+
+  /charges/{id}/transitions:
+    post:
+      tags: [Charges]
+      summary: Transition charge status
+      description: Move a charge through its lifecycle (`invoiced`, `waived`, `cancelled`).
+      operationId: transitionCharge
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to:
+                  type: string
+                  enum: [invoiced, waived, cancelled]
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: Transition applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Charge' }
+        '409':
+          description: Illegal transition for current state
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /charges/{id}/exports:
+    get:
+      tags: [Charges]
+      summary: List export acknowledgements for a charge
+      description: |
+        Every time your ERP successfully posts this charge, the integrator calls `POST` here with the
+        external document ID. This endpoint returns the full history so integrators can answer
+        "where did this charge land and when?"
+      operationId: listChargeExports
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/ChargeExport' } }
+    post:
+      tags: [Charges]
+      summary: Record that a charge was exported to an external system
+      description: |
+        Idempotent. Call after posting the charge into SAP / Oracle / etc. The `external_id` you
+        supply is your dedup key for retries. OpenIRIS flips the charge's `status` to `exported`.
+      operationId: recordChargeExport
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_id, external_system, exported_at]
+              properties:
+                external_id:
+                  type: string
+                  maxLength: 64
+                  description: Your system's document / journal entry ID. Serves as your dedup key.
+                external_system:
+                  type: string
+                  maxLength: 32
+                  example: sap-s4hana
+                exported_at:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+                  maxLength: 500
+      responses:
+        '201':
+          description: Export recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChargeExport' }
+
+  /charges/{id}/confirmation:
+    put:
+      tags: [Charges]
+      summary: Sign a charge off as checked and ready to bill
+      description: |
+        Sets `confirmed_at`. Idempotent: re-confirming returns the original timestamp rather than
+        re-stamping it, so a retry never moves the sign-off moment.
+
+        Confirmation is **not** a `status` value. `status` holds one value at a time, so a
+        `confirmed` member would disappear the moment the charge was invoiced. `confirmed_at` is
+        its own field and survives invoicing and export.
+
+        A waived charge cannot be confirmed (`409`) — it will never be billed.
+      operationId: confirmCharge
+      security:
+        - ApiKey: [billing:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmed_at:
+                  type: string
+                  format: date-time
+                  description: Defaults to now. Supply it when replaying a sign-off recorded elsewhere.
+                notes: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: Confirmed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChargeConfirmation' }
+        '409':
+          description: The charge is waived
+    delete:
+      tags: [Charges]
+      summary: Withdraw a charge's sign-off
+      description: |
+        Clears `confirmed_at` — the corrective half of the reviewer's workflow, for when a check
+        turns up something to fix. Withdrawing an unconfirmed charge is a no-op `204`; only an
+        unknown charge is a `404`.
+      operationId: withdrawChargeConfirmation
+      security:
+        - ApiKey: [billing:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '204':
+          description: Withdrawn
+
+  /charges/confirmations:
+    post:
+      tags: [Charges]
+      summary: Set the sign-off flag on a set of charges
+      description: |
+        A period close covers far more charges than per-charge round-trips can carry, so sign-off
+        is settable in bulk — up to 500 ids per call. Send `confirmed: false` to withdraw the same
+        way.
+
+        Partial success by design: ids the key cannot see, and waived charges, come back in
+        `rejected` rather than failing the batch.
+      operationId: bulkConfirmCharges
+      security:
+        - ApiKey: [billing:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [charge_ids]
+              properties:
+                charge_ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: integer }
+                confirmed:
+                  type: boolean
+                  default: true
+                  description: False withdraws the sign-off instead of setting it.
+                confirmed_at: { type: string, format: date-time }
+                notes: { type: string, maxLength: 1000 }
+      responses:
+        '200':
+          description: Applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changed: { type: array, items: { type: integer }, description: Ids whose flag this call changed. }
+                  unchanged: { type: array, items: { type: integer }, description: Ids already in the requested state. }
+                  rejected:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        charge_id: { type: integer }
+                        reason: { type: string, enum: [not_found, waived] }
+
+  /charges/bulk-export:
+    post:
+      tags: [Charges]
+      summary: Bulk export charges as an async task
+      description: |
+        For integrators pulling large date ranges (e.g. month-end reconciliation). Returns `202`
+        with a `task_id`; poll `/tasks/{task_id}` or include `completion_webhook_url` to be notified.
+      operationId: bulkExportCharges
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date-time }
+                to: { type: string, format: date-time }
+                status:
+                  type: array
+                  items: { type: string, enum: [unbilled, invoiced, exported, waived] }
+                format:
+                  type: string
+                  enum: [json, csv, ndjson]
+                  default: json
+                completion_webhook_url:
+                  type: string
+                  format: uri
+      responses:
+        '202':
+          description: Accepted — poll /tasks/{id}
+          headers:
+            Location:
+              schema: { type: string, example: /v1/tasks/tsk_abc123 }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id: { type: string, example: tsk_abc123 }
+                  status: { type: string, example: queued }
+
+  /invoices:
+    get:
+      tags: [Invoices]
+      summary: List invoices
+      description: |
+        **Parked (preview-v13).** Charge confirmation and export acknowledgements cover the
+        vetted-charges workflow; this document surface is not planned unless a member still needs
+        it. It would also need schema additions — the `Invoice` entity lacks `subtotal`,
+        `tax_total`, `total`, `currency`, `issued_at`, `due_at`, `paid_at`.
+      operationId: listInvoices
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [draft, sent, paid, void] }
+        - name: 'filter[date][gte]'
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Invoice' } }
+
+  /invoices/{id}:
+    get:
+      tags: [Invoices]
+      operationId: getInvoice
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Expand'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invoice' }
+    patch:
+      tags: [Invoices]
+      operationId: patchInvoice
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvoicePatch' }
+      responses:
+        '200':
+          description: Updated
+          content: { application/json: { schema: { $ref: '#/components/schemas/Invoice' } } }
+    delete:
+      tags: [Invoices]
+      summary: Void an invoice (soft)
+      operationId: voidInvoice
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Voided }
+
+  /invoices/{id}/charges:
+    get:
+      tags: [Invoices]
+      operationId: getInvoiceCharges
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Charge' } }
+
+  /invoices/{id}/pdf:
+    get:
+      tags: [Invoices]
+      summary: Download invoice PDF
+      operationId: getInvoicePdf
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '302':
+          description: Redirect to pre-signed PDF URL
+        '200':
+          description: PDF stream
+          content:
+            application/pdf: {}
+
+  /invoices/{id}/exports:
+    post:
+      tags: [Invoices]
+      summary: Record invoice export to external system
+      operationId: recordInvoiceExport
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [external_id, external_system]
+              properties:
+                external_id: { type: string }
+                external_system: { type: string }
+      responses:
+        '201': { description: Recorded }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # BOOKINGS — priority-1, fully specified
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /bookings:
+    get:
+      tags: [Bookings]
+      summary: List bookings
+      description: |
+        ✅ **Shipped (preview-v13).** Bookings on the key's providers' resources, cursor-paginated.
+        `status` is derived (Appendix A) and re-derived in SQL for the filter; `kind` separates
+        usage entries recorded after the fact from reservations. Sort by `id`, `start`, `end`,
+        `created_at`. Every filter below also accepts the comparison forms shown.
+      operationId: listBookings
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - name: 'filter[resource_id]'
+          in: query
+          schema: { type: integer, description: 'Also filter[resource_id][in]=1,2' }
+        - name: 'filter[provider_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[user_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[group_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[project_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[request_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[status]'
+          in: query
+          schema: { $ref: '#/components/schemas/BookingStatus' }
+        - name: 'filter[kind]'
+          in: query
+          schema: { type: string, enum: [booking, usage] }
+        - name: 'filter[external_reference]'
+          in: query
+          schema: { type: string, maxLength: 35, description: 'Also filter[external_reference][in]=A,B' }
+        - name: 'filter[start][gte]'
+          in: query
+          schema: { type: string, format: date-time, description: 'gte | gt | lt | lte' }
+        - name: 'filter[end][lt]'
+          in: query
+          schema: { type: string, format: date-time, description: 'gte | gt | lt | lte' }
+        - name: 'filter[created_at][gte]'
+          in: query
+          schema: { type: string, format: date-time, description: 'gte | gt | lt | lte' }
+        - name: 'filter[updated_at][gte]'
+          in: query
+          schema: { type: string, format: date-time, description: 'gte | gt | lt | lte; rows with a NULL updated_at are excluded' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Booking' } }
+    post:
+      tags: [Bookings]
+      summary: Create a booking — usage entries shipped, reservations proposed
+      description: |
+        ✅ **`kind: usage` shipped (preview-v13).** Records a completed measurement as a booking
+        entirely in the past (`end <= now`), the same row shape an admin produces by hand: no
+        approval, attributed to the API service user, `kind` reads back as `usage`. Must not
+        overlap an existing booking on a non-concurrent resource (409, never a delete); the
+        user must exist and, when `group_id` is given, be an active member of that group.
+        Charges for usage entries follow once the pricing engine is shared with the Public host
+        (contracts proposal §6.2b).
+
+        **`kind: booking` (a reservation in advance) is the next increment** and returns 422 today:
+        it needs the rules engine and pricing path the Internal host owns.
+      operationId: createBooking
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingCreate' }
+      responses:
+        '201':
+          description: Created
+          content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /bookings/{id}:
+    get:
+      tags: [Bookings]
+      operationId: getBooking
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Expand'
+      responses:
+        '200':
+          description: OK
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Bookings]
+      summary: Update the integrator-owned fields
+      description: |
+        ✅ **Shipped (preview-v13)** for `external_reference` and `comments` only — the ELN
+        round-trip. Times, users and resources are not editable through the Public API; those
+        edits re-run rules and pricing. `If-Match` required (428 without, 412 when stale); send an
+        empty `external_reference` to clear it.
+      operationId: patchBooking
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BookingPatch' } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '412': { description: ETag mismatch }
+    delete:
+      tags: [Bookings]
+      summary: Cancel a booking
+      description: |
+        Soft-cancel (sets `is_cancelled=true`, retains the record for audit/billing). **Not** a
+        hard delete — the row persists.
+      operationId: cancelBooking
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Cancelled }
+
+  /bookings/bulk:
+    post:
+      tags: [Bookings]
+      summary: Create multiple bookings in one call (async)
+      operationId: bulkCreateBookings
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookings]
+              properties:
+                bookings:
+                  type: array
+                  maxItems: 500
+                  items: { $ref: '#/components/schemas/BookingCreate' }
+                completion_webhook_url: { type: string, format: uri }
+      responses:
+        '202':
+          description: Accepted — poll /tasks/{id}
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id: { type: string }
+                  status: { type: string, example: queued }
+
+  /bookings/{id}/charges:
+    get:
+      tags: [Bookings]
+      operationId: getBookingCharges
+      security:
+        - ApiKey: [billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Charge' } }
+
+  /bookings/{id}/attachments:
+    get:
+      tags: [Bookings]
+      operationId: listBookingAttachments
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
+    post:
+      tags: [Bookings]
+      summary: Attach a file to a booking
+      operationId: addBookingAttachment
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                description: { type: string }
+      responses:
+        '201': { description: Attached, content: { application/json: { schema: { $ref: '#/components/schemas/Attachment' } } } }
+
+  /bookings/{id}/form-submission:
+    get:
+      tags: [Bookings]
+      summary: Get the form submission attached to a booking
+      description: Returns the typed JSON view — binary `Data` column is deserialized server-side.
+      operationId: getBookingFormSubmission
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FormSubmission' }
+        '404': { description: No form submitted for this booking }
+
+  /bookings/{id}/audit-log:
+    get:
+      tags: [Bookings]
+      summary: Per-booking change history
+      description: Backed by `ResourceBookingLogs` (277 K rows, keyed by booking ID).
+      operationId: getBookingAuditLog
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        at: { type: string, format: date-time }
+                        actor_id: { type: integer }
+                        action: { type: string, example: approval_changed }
+                        before: { type: object, additionalProperties: true }
+                        after: { type: object, additionalProperties: true }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # BOOKING SERIES
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /booking-series:
+    get:
+      tags: [Booking series]
+      operationId: listBookingSeries
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/BookingSeries' } }
+    post:
+      tags: [Booking series]
+      summary: Create a recurring booking series (async — creates N occurrences)
+      operationId: createBookingSeries
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingSeriesCreate' }
+      responses:
+        '202':
+          description: Accepted — poll /tasks/{id} for expansion progress
+
+  /booking-series/{id}:
+    get:
+      tags: [Booking series]
+      operationId: getBookingSeries
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Expand'
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/BookingSeries' } } }
+    patch:
+      tags: [Booking series]
+      summary: Modify series (scope=this | following | all)
+      operationId: patchBookingSeries
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope: { type: string, enum: [this, following, all], default: all }
+                title: { type: string }
+                end_until: { type: string, format: date-time }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Booking series]
+      summary: Cancel series (scope=this | following | all)
+      operationId: cancelBookingSeries
+      security:
+        - ApiKey: [bookings:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: scope
+          in: query
+          schema: { type: string, enum: [this, following, all], default: all }
+      responses:
+        '200': { description: Cancelled }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # RESOURCES — priority-1, fully specified
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /resources:
+    get:
+      tags: [Resources]
+      operationId: listResources
+      security:
+        - ApiKey: [resources:read]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - name: 'filter[class]'
+          in: query
+          schema: { type: string, enum: [scheduled, application, service, scheduled_addon, event] }
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [active, inactive, archived] }
+        - name: 'filter[provider_id]'
+          in: query
+          schema: { type: string }
+        - name: 'filter[q]'
+          in: query
+          schema:
+            type: string
+            description: 'Full-text search via the [Inbox] catalog'
+        - name: 'filter[external_reference]'
+          in: query
+          schema: { type: string, maxLength: 35, description: 'Lookup by asset-management mapping key; also filter[external_reference][in]=A,B' }
+        - name: 'filter[resource_type_id]'
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Resource' } }
+    post:
+      tags: [Resources]
+      summary: Provision a resource stub from asset-management master data
+      description: |
+        ✅ **Shipped (preview-v13; proposed in preview-v8 from integrator feedback).** Creates a resource in `status:
+        inactive` (a non-bookable **draft stub**, offline and invisible to users) from institutional asset-management master data —
+        e.g. a newly acquired instrument in SAP Asset Accounting. Configuration and enrichment
+        (booking rules, pricing, forms, visibility) remain in the OpenIRIS UI; this endpoint
+        deliberately accepts master data only. `external_reference` (unique per provider) is the
+        mapping key between the asset system and OpenIRIS — sync jobs look up by
+        `filter[external_reference]` and create only on miss. `resource_type_id` is required —
+        resolve it via `GET /resource-types`.
+      operationId: provisionResource
+      security:
+        - ApiKey: [resources:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResourceProvision' }
+      responses:
+        '201':
+          description: Created (status `inactive` — finish configuration in the OpenIRIS UI)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Resource' }
+        '409':
+          description: A resource with this external_reference already exists for the provider
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /resources/{id}/transitions:
+    post:
+      tags: [Resources]
+      summary: Archive a resource (e.g. on asset disposal)
+      description: |
+        ✅ **Shipped (preview-v13; proposed in preview-v8).** `archived` ends bookability while preserving history —
+        the counterpart of asset disposal in the institutional system. There is no delete: bookings,
+        charges, and audit history reference the resource forever. `inactive` ↔ `active` transitions
+        stay in the admin UI in v1.1 (activation implies configuration is complete, which the API
+        cannot judge). Refused with 409 while future bookings exist; repeating the call on an
+        archived resource returns 200 with the unchanged state.
+      operationId: transitionResource
+      security:
+        - ApiKey: [resources:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { type: string, enum: [archived] }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Transition applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Resource' }
+        '409':
+          description: Future bookings still exist on the resource
+        '422':
+          description: Unsupported transition (only `archived` exists in v1)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /resources/{id}:
+    get:
+      tags: [Resources]
+      operationId: getResource
+      security:
+        - ApiKey: [resources:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Expand'
+      responses:
+        '200':
+          description: OK
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/Resource' } } }
+
+  /resources/{id}/current-booking:
+    get:
+      tags: [Resources]
+      summary: Does this user hold a valid booking on the resource right now?
+      description: |
+        ✅ **Shipped (preview-v13).** The door- / lab-entry answer: a booking grants access when it
+        covers `at` (default now), is not cancelled and is not awaiting or refused approval. The
+        user matches personally, or through an active membership of the group the booking was
+        made for (`via: group`); a personal match wins when both apply. Always 200 for a visible
+        resource — `access` is in the body — so a controller never has to interpret error codes.
+        Distinct from `/access-check` (proposed), which answers whether a user *could* book.
+      operationId: getCurrentBooking
+      security:
+        - ApiKey: [bookings:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: user_id
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: at
+          in: query
+          schema: { type: string, format: date-time, description: 'Instant to evaluate; defaults to now (UTC).' }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/CurrentBooking' } } }
+        '400': { description: user_id missing }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /resources/{id}/availability:
+    get:
+      tags: [Resources]
+      summary: Resource availability / busy intervals
+      operationId: getResourceAvailability
+      security:
+        - ApiKey: [resources:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  busy:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        start: { type: string, format: date-time }
+                        end: { type: string, format: date-time }
+                        booking_id: { type: integer }
+
+  /resources/{id}/scheduled-addons:
+    get:
+      tags: [Resources]
+      summary: Add-ons that can be attached to a booking slot
+      operationId: getResourceScheduledAddons
+      security:
+        - ApiKey: [resources:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+
+  /resources/{id}/forms:
+    get:
+      tags: [Resources]
+      summary: Form templates attached to this resource
+      operationId: getResourceForms
+      security:
+        - ApiKey: [resources:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Form' } }
+
+  /resources/{id}/price-types:
+    get:
+      tags: [Resources]
+      operationId: getResourcePriceTypes
+      security:
+        - ApiKey: [resources:read, billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      responses:
+        '200': { description: OK }
+
+  /resources/{id}/price-estimate:
+    post:
+      tags: [Resources]
+      summary: Preview charges for a hypothetical booking
+      description: Pure preview — no booking created, no charge persisted.
+      operationId: estimateResourcePrice
+      security:
+        - ApiKey: [resources:read, billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, start, end]
+              properties:
+                user_id: { type: integer }
+                group_id: { type: integer }
+                project_id: { type: integer }
+                start: { type: string, format: date-time }
+                end: { type: string, format: date-time }
+                products:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      product_id: { type: integer }
+                      quantity: { type: number }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: number }
+                  currency: { type: string, example: EUR }
+                  line_items: { type: array, items: { $ref: '#/components/schemas/ChargeLineItem' } }
+
+  /resources/{id}/access-check:
+    post:
+      tags: [Resources]
+      summary: Can this user book this resource?
+      operationId: checkResourceAccess
+      security:
+        - ApiKey: [resources:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, start, end]
+              properties:
+                user_id: { type: integer }
+                start: { type: string, format: date-time }
+                end: { type: string, format: date-time }
+                group_id: { type: integer }
+                project_id: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  can_book: { type: boolean }
+                  reasons:
+                    type: array
+                    items: { type: string }
+                    description: Explanations if can_book=false
+
+  /resources/{id}/cost-center-options:
+    post:
+      tags: [Resources]
+      summary: Which cost centers apply for a given booking context?
+      operationId: getResourceCostCenterOptions
+      security:
+        - ApiKey: [resources:read, billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id: { type: integer }
+                group_id: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  options: { type: array, items: { $ref: '#/components/schemas/CostCenter' } }
+                  default_code: { type: string }
+
+  /resources/{id}/calendar.ics:
+    get:
+      tags: [Resources, Calendar feeds]
+      summary: iCalendar feed for a resource
+      description: |
+        Standard iCalendar format. URL-level token in the query string authorises access so users
+        can subscribe the URL directly in Outlook/Google Calendar. Rotate via
+        `POST /calendar-feeds/{id}/rotate-token`.
+      operationId: getResourceCalendarFeed
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            text/calendar:
+              schema: { type: string }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # REQUESTS — priority-1, fully specified (sub-resources stubbed)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /requests:
+    get:
+      tags: [Requests]
+      operationId: listRequests
+      security:
+        - ApiKey: [requests:read]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [pending, active, rejected, closed, inactive, reviewed, discontinued] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Request' } }
+    post:
+      tags: [Requests]
+      operationId: createRequest
+      security:
+        - ApiKey: [requests:write]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestCreate' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Request' } } } }
+
+  /requests/{id}:
+    get:
+      tags: [Requests]
+      operationId: getRequest
+      security:
+        - ApiKey: [requests:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Expand'
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Request' } } } }
+    patch:
+      tags: [Requests]
+      operationId: patchRequest
+      security:
+        - ApiKey: [requests:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RequestPatch' }
+      responses:
+        '200': { description: Updated }
+
+  /requests/{id}/transitions:
+    post:
+      tags: [Requests]
+      summary: Transition request lifecycle
+      operationId: transitionRequest
+      security:
+        - ApiKey: [requests:write]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { type: string, enum: [active, completed, rejected] }
+                reason: { type: string }
+      responses:
+        '200': { description: Transitioned }
+
+  /requests/{id}/send-to-charges:
+    post:
+      tags: [Requests]
+      summary: Generate charges from request products / services
+      operationId: sendRequestToCharges
+      security:
+        - ApiKey: [requests:write, billing:read]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scope: { type: string, enum: [products, services, all], default: all }
+      responses:
+        '201': { description: Charges generated }
+
+  /requests/{id}/notes:
+    get:
+      tags: [Requests]
+      operationId: listRequestNotes
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Requests]
+      operationId: addRequestNote
+      security: [{ ApiKey: [requests:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+                visibility: { type: string, enum: [internal, shared] }
+      responses: { '201': { description: Created } }
+
+  /requests/{id}/history:
+    get:
+      tags: [Requests]
+      operationId: getRequestHistory
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /requests/{id}/participants:
+    get:
+      tags: [Requests]
+      summary: The people on a request
+      description: |
+        Everyone who can reach the request: its owner (`role: owner`, always first
+        and always present) followed by the people on its Participants tab.
+
+        OpenIRIS grants request access on the participant link existing, **not** on
+        its `status`, so a directory or IAM sync should take the whole collection
+        rather than filter to `status: approved`. Rejecting a participant deletes
+        the row outright, which is why rejections are rarely seen here.
+
+        The owner is returned whether or not a participant row also exists for
+        them — only about 30% of requests that have participants carry one for
+        their own owner, so a client reading a raw participants table would drop
+        the one person guaranteed to have access.
+      operationId: listRequestParticipants
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/RequestParticipant' }
+
+  /requests/{id}/approvers:
+    get:
+      tags: [Requests]
+      operationId: listRequestApprovers
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Requests]
+      operationId: addRequestApprover
+      security: [{ ApiKey: [requests:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '201': { description: Created } }
+
+  /requests/{id}/subscribers:
+    get:
+      tags: [Requests]
+      operationId: listRequestSubscribers
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Requests]
+      operationId: addRequestSubscriber
+      security: [{ ApiKey: [requests:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '201': { description: Created } }
+
+  /requests/{id}/milestones:
+    get:
+      tags: [Requests]
+      operationId: listRequestMilestones
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /requests/{id}/products:
+    get:
+      tags: [Requests]
+      operationId: listRequestProducts
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /requests/{id}/messages:
+    get:
+      tags: [Requests]
+      operationId: listRequestMessages
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Requests]
+      operationId: postRequestMessage
+      security: [{ ApiKey: [requests:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '201': { description: Created } }
+
+  /requests/{id}/attachments:
+    get:
+      tags: [Requests]
+      operationId: listRequestAttachments
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Requests]
+      operationId: addRequestAttachment
+      security: [{ ApiKey: [requests:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '201': { description: Created } }
+
+  /requests/{id}/form-submission:
+    get:
+      tags: [Requests]
+      operationId: getRequestFormSubmission
+      security: [{ ApiKey: [requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /requests/{id}/charges:
+    get:
+      tags: [Requests]
+      operationId: getRequestCharges
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # WEBHOOKS — priority-1, fully specified
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /webhooks:
+    get:
+      tags: [Webhooks]
+      operationId: listWebhooks
+      security:
+        - ApiKey: [webhooks:manage]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Webhook' } }
+    post:
+      tags: [Webhooks]
+      operationId: createWebhook
+      security:
+        - ApiKey: [webhooks:manage]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookCreate' }
+      responses:
+        '201':
+          description: |
+            Created. The `signing_secret` is returned ONCE in the response body and never again —
+            store it securely. Reset via `POST /webhooks/{id}/rotate-secret`.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Webhook'
+                  - type: object
+                    properties:
+                      signing_secret: { type: string }
+
+  /webhooks/{id}:
+    get:
+      tags: [Webhooks]
+      operationId: getWebhook
+      security: [{ ApiKey: [webhooks:manage] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Webhook' } } } } }
+    patch:
+      tags: [Webhooks]
+      operationId: patchWebhook
+      security: [{ ApiKey: [webhooks:manage] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content: { application/json: { schema: { $ref: '#/components/schemas/WebhookPatch' } } }
+      responses: { '200': { description: Updated } }
+    delete:
+      tags: [Webhooks]
+      operationId: deleteWebhook
+      security: [{ ApiKey: [webhooks:manage] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '200': { description: Deleted } }
+
+  /webhooks/{id}/test:
+    post:
+      tags: [Webhooks]
+      summary: Fire a synthetic test event
+      operationId: testWebhook
+      security:
+        - ApiKey: [webhooks:manage]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event:
+                  type: string
+                  description: Event name to simulate; defaults to webhook.test
+                  example: booking.created
+      responses:
+        '202':
+          description: Test delivery queued
+
+  /webhooks/{id}/deliveries:
+    get:
+      tags: [Webhooks]
+      summary: Delivery activity log
+      operationId: listWebhookDeliveries
+      security:
+        - ApiKey: [webhooks:manage]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/WebhookDelivery' } }
+
+  /webhooks/{id}/deliveries/{delivery_id}/redeliver:
+    post:
+      tags: [Webhooks]
+      operationId: redeliverWebhook
+      security:
+        - ApiKey: [webhooks:manage]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: delivery_id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202': { description: Redelivery queued }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # EVENTS — priority-1, fully specified
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /events:
+    get:
+      tags: [Events]
+      summary: Catalogue of event types fired over webhooks
+      operationId: listEvents
+      security:
+        - ApiKey: [webhooks:manage]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/EventCatalogEntry' }
+
+  /events/{name}:
+    get:
+      tags: [Events]
+      summary: JSON Schema for a given event's payload
+      operationId: getEventSchema
+      security:
+        - ApiKey: [webhooks:manage]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string, example: charge.exported }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: {}
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # ASYNC TASKS
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /tasks/{id}:
+    get:
+      tags: [Async tasks]
+      operationId: getTask
+      security: []
+      parameters: [{ $ref: '#/components/parameters/PathIdStr' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /tasks/{id}/cancel:
+    post:
+      tags: [Async tasks]
+      operationId: cancelTask
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PathIdStr'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Cancellation requested }
+        '409': { description: Task cannot be cancelled in its current state }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # SEARCH
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /search:
+    get:
+      tags: [Search]
+      summary: Federated full-text search
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: types
+          in: query
+          schema: { type: string, example: bookings,requests,resources,users }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string }
+                        id: { type: integer }
+                        title: { type: string }
+                        snippet: { type: string }
+                        links: { $ref: '#/components/schemas/ResourceLinks' }
+                  meta:
+                    type: object
+                    properties:
+                      counts_by_type:
+                        type: object
+                        additionalProperties: { type: integer }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # USERS / GROUPS / ORGANIZATIONS / PROJECTS — stubbed
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List users visible to the caller
+      description: |
+        ✅ **Shipped (preview-v13).** Users of organizations trusted by the key's providers — the
+        same rule as groups. `filter[email]=` (or `filter[email][in]=a,b`) is the lookup a
+        directory sync runs before `POST /groups/{id}/members`; email comparison follows the
+        database collation (case-insensitive). Sort by `id`, `email`, `last_name`. Never carries
+        credentials or verification codes.
+      operationId: listUsers
+      security: [{ ApiKey: [users:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - name: 'filter[email]'
+          in: query
+          schema: { type: string, format: email, description: 'Also filter[email][in]=a@x,b@x' }
+        - name: 'filter[organization_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[is_disabled]'
+          in: query
+          schema: { type: boolean }
+        - name: 'filter[is_verified]'
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/CollectionEnvelope' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/User' } } } }] } } } }
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      operationId: getUser
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } } }
+
+  /users/{id}/memberships:
+    get:
+      tags: [Users]
+      operationId: getUserMemberships
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /groups:
+    get:
+      tags: [Groups]
+      summary: Groups of organizations trusted by the key's providers
+      operationId: listGroups
+      security: [{ ApiKey: [users:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: 'filter[organization_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[name]'
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Group' } }
+
+  /groups/{id}:
+    get:
+      tags: [Groups]
+      operationId: getGroup
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Group' } } } }
+
+  /groups/{id}/members:
+    get:
+      tags: [Groups]
+      summary: All memberships, every status - filter client-side
+      operationId: getGroupMembers
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/GroupMember' } }
+    post:
+      tags: [Groups]
+      summary: Add a user to a group
+      description: |
+        **Target v1 (preview-v8, from integrator feedback).** For institutions whose directory
+        (e.g. AD) lacks the metadata to map users to OpenIRIS groups — sync jobs add/remove
+        individual memberships. Idempotent: adding an existing member returns 200 with the current
+        membership, not an error. Fires the `group.member_added` webhook.
+
+        A declarative replace-all `PUT` was considered and **rejected**: group membership drives
+        both access and billing attribution, and one faulty sync run would empty a group. Diff on
+        the client and apply individual add/remove calls. Membership changes never retro-affect
+        existing bookings or charges.
+      operationId: addGroupMember
+      security: [{ ApiKey: [groups:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: { type: integer }
+      responses:
+        '201':
+          description: Added (200 if already a member)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  group_id: { type: integer }
+                  user_id: { type: integer }
+                  added_at: { type: string, format: date-time }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /groups/{id}/members/{user_id}:
+    delete:
+      tags: [Groups]
+      summary: Remove a user from a group
+      description: |
+        **Target v1 (preview-v8).** Idempotent — removing a non-member returns 204. Fires the
+        `group.member_removed` webhook. Does not retro-affect existing bookings or charges
+        attributed to the user under this group.
+      operationId: removeGroupMember
+      security: [{ ApiKey: [groups:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '204': { description: Removed (or was not a member) }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /organizations:
+    get:
+      tags: [Organizations]
+      operationId: listOrganizations
+      security: [{ ApiKey: [users:read] }]
+      responses: { '200': { description: OK } }
+
+  /organizations/{id}:
+    get:
+      tags: [Organizations]
+      operationId: getOrganization
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List projects
+      description: |
+        ✅ **Shipped (preview-v13).** Projects of organizations trusted by the key's providers.
+        Sort by `id`, `name`.
+      operationId: listProjects
+      security: [{ ApiKey: [users:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - name: 'filter[external_reference]'
+          in: query
+          schema: { type: string, maxLength: 35 }
+        - name: 'filter[name]'
+          in: query
+          schema: { type: string, description: 'eq | contains | starts_with' }
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [active, on_hold, inactive, published] }
+        - name: 'filter[organization_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[group_id]'
+          in: query
+          schema: { type: integer }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/CollectionEnvelope' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Project' } } } }] } } } }
+    post:
+      tags: [Projects]
+      summary: Create a project
+      description: |
+        ✅ **Shipped (preview-v13; proposed in preview-v8 from integrator feedback).** Lets an external proposal system
+        create the OpenIRIS project once a proposal is granted. `organization_id` may be omitted when
+        `group_id` is given (it is derived from the group); both must belong to an organization the
+        key's providers trust. Members are given **by email**, resolved against *visible* users, and
+        resolved against existing users; emails with no matching user are returned in
+        `unmatched_emails` for manual handling. The API deliberately does **not** auto-create user
+        accounts (duplicate-account and SSO-mismatch risk) — an invitation flow is a candidate for
+        a later version.
+      operationId: createProject
+      security: [{ ApiKey: [projects:write] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Project'
+                  - type: object
+                    properties:
+                      unmatched_emails:
+                        type: array
+                        items: { type: string, format: email }
+                        description: Member emails that matched no existing user — resolve manually.
+        '409':
+          description: A project with this external_reference already exists
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /projects/{id}:
+    get:
+      tags: [Projects]
+      operationId: getProject
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{id}/members:
+    get:
+      tags: [Projects]
+      summary: The project's direct members and admins
+      description: |
+        ✅ **Shipped (preview-v13).** Direct `ProjectMembership` rows plus project admins, identity
+        inlined so a sync needs no second lookup. Members linked through a group are not expanded.
+      operationId: listProjectMembers
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/CollectionEnvelope' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ProjectMember' } } } }] } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Projects]
+      summary: Add a member to a project
+      description: '✅ **Shipped (preview-v13).** Same semantics as group members: idempotent, by user_id; an unknown user_id is 422 — users are never auto-created.'
+      operationId: addProjectMember
+      security: [{ ApiKey: [projects:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: { type: integer }
+      responses:
+        '201': { description: Added (200 if already a member) }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /projects/{id}/members/{user_id}:
+    delete:
+      tags: [Projects]
+      summary: Remove a member from a project
+      description: '✅ **Shipped (preview-v13).** Idempotent — 204 whether or not the row existed.'
+      operationId: removeProjectMember
+      security: [{ ApiKey: [projects:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '204': { description: Removed (or was not a member) }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # ISSUES / MISUSE — stubbed
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /issues:
+    get:
+      tags: [Issues]
+      operationId: listIssues
+      security: [{ ApiKey: [users:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: 'filter[resource_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [open, in_progress, resolved, closed] }
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Issues]
+      operationId: createIssue
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, resource_id]
+              properties:
+                title: { type: string }
+                text: { type: string }
+                is_urgent: { type: boolean }
+                resource_id: { type: integer }
+      responses: { '201': { description: Created } }
+
+  /issues/{id}:
+    get:
+      tags: [Issues]
+      operationId: getIssue
+      security: [{ ApiKey: [users:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+    patch:
+      tags: [Issues]
+      operationId: patchIssue
+      security: [{ ApiKey: [users:read] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '200': { description: Updated } }
+
+  /misuse-records:
+    get:
+      tags: [Misuse records]
+      summary: Penalty / policy-violation records (read-only externally)
+      operationId: listMisuseRecords
+      security: [{ ApiKey: [bookings:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: 'filter[user_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [active, resolved, expunged] }
+      responses: { '200': { description: OK } }
+
+  /misuse-records/{id}:
+    get:
+      tags: [Misuse records]
+      operationId: getMisuseRecord
+      security: [{ ApiKey: [bookings:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # COST CENTERS / PRICES / QUOTES / ORDERS — stubbed
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /cost-centers:
+    get:
+      tags: [Cost centers]
+      operationId: listCostCenters
+      security: [{ ApiKey: [billing:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [active, inactive] }
+        - name: 'filter[code]'
+          in: query
+          schema: { type: string, maxLength: 10, description: Exact-match lookup — the diff key for nightly ERP sync jobs (new in preview-v8) }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/CollectionEnvelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/CostCenterAccount' } }
+    post:
+      tags: [Cost centers]
+      summary: Create a cost center
+      description: |
+        **Target v1 (preview-v8, from integrator feedback).** Enables automatic sync of valid
+        billing codes (SAP WBS elements, cost centers) from the institutional ERP — no more manual
+        entry and manual inactivation. `code` is unique per provider, ≤10 alphanumeric (SAP cost
+        center length limit, enforced on write). Sync recipe: `GET ?filter[code]=` → `POST` on
+        miss, `PATCH` status on validity change.
+      operationId: createCostCenter
+      security: [{ ApiKey: [cost-centers:write] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string, maxLength: 10, pattern: '^[A-Za-z0-9]+$' }
+                name: { type: string, maxLength: 200 }
+                remit_code: { type: string, nullable: true }
+                billing_address: { type: string, nullable: true }
+                provider_id: { type: integer, description: Required when the key resolves to multiple providers }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CostCenterAccount' }
+        '409':
+          description: Code already exists for this provider
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /cost-centers/{id}:
+    get:
+      tags: [Cost centers]
+      operationId: getCostCenter
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+    patch:
+      tags: [Cost centers]
+      summary: Update a cost center (incl. inactivation)
+      description: |
+        **Target v1 (preview-v8).** Inactivation (`status: inactive`) stops the code being
+        selectable for **new** bookings/charges; existing charges keep referencing it — cost
+        centers are never deleted. Reactivation is allowed.
+      operationId: patchCostCenter
+      security: [{ ApiKey: [cost-centers:write] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 200 }
+                status: { type: string, enum: [active, inactive] }
+                remit_code: { type: string, nullable: true }
+                billing_address: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CostCenterAccount' }
+        '412': { description: If-Match precondition failed }
+
+  /price-types:
+    get:
+      tags: [Price types]
+      operationId: listPriceTypes
+      security: [{ ApiKey: [billing:read] }]
+      responses: { '200': { description: OK } }
+
+  /price-types/{id}:
+    get:
+      tags: [Price types]
+      operationId: getPriceType
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /price-types/{id}/items:
+    get:
+      tags: [Price types]
+      operationId: getPriceTypeItems
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /billing-quotes:
+    get:
+      tags: [Billing quotes]
+      operationId: listBillingQuotes
+      security: [{ ApiKey: [billing:read] }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Billing quotes]
+      operationId: createBillingQuote
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { description: Created } }
+
+  /billing-quotes/{id}:
+    get:
+      tags: [Billing quotes]
+      operationId: getBillingQuote
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  /group-orders:
+    get:
+      tags: [Group orders]
+      operationId: listGroupOrders
+      security: [{ ApiKey: [billing:read] }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Group orders]
+      operationId: createGroupOrder
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { description: Created } }
+
+  /group-orders/{id}:
+    get:
+      tags: [Group orders]
+      operationId: getGroupOrder
+      security: [{ ApiKey: [billing:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK } }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # FORMS & ATTACHMENTS
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /forms:
+    get:
+      tags: [Forms]
+      operationId: listForms
+      security: [{ ApiKey: [resources:read] }]
+      parameters:
+        - name: 'filter[resource_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[provider_id]'
+          in: query
+          schema: { type: integer }
+      responses: { '200': { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Form' } } } } } } } }
+
+  /forms/{id}:
+    get:
+      tags: [Forms]
+      operationId: getForm
+      security: [{ ApiKey: [resources:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Form' } } } } }
+
+  /form-submissions:
+    get:
+      tags: [Forms]
+      operationId: listFormSubmissions
+      security: [{ ApiKey: [resources:read] }]
+      parameters:
+        - name: 'filter[form_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[booking_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[user_id]'
+          in: query
+          schema: { type: integer }
+      responses: { '200': { description: OK } }
+
+  /form-submissions/{id}:
+    get:
+      tags: [Forms]
+      operationId: getFormSubmission
+      security: [{ ApiKey: [resources:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FormSubmission' } } } } }
+
+  /attachments:
+    post:
+      tags: [Attachments]
+      summary: Upload (multipart; large files get a pre-signed URL)
+      operationId: uploadAttachment
+      security: [{ ApiKey: [bookings:write, requests:write] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Uploaded
+          content: { application/json: { schema: { $ref: '#/components/schemas/Attachment' } } }
+
+  /attachments/{id}:
+    get:
+      tags: [Attachments]
+      operationId: getAttachment
+      security: [{ ApiKey: [bookings:read, requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathIdStr' }]
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Attachment' } } }
+
+  /attachments/{id}/content:
+    get:
+      tags: [Attachments]
+      summary: Stream the file content
+      operationId: getAttachmentContent
+      security: [{ ApiKey: [bookings:read, requests:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathIdStr' }]
+      responses:
+        '200':
+          description: File stream
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # CALENDAR FEEDS (management)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /calendar-feeds:
+    get:
+      tags: [Calendar feeds]
+      operationId: listCalendarFeeds
+      security: [{ ApiKey: [resources:read] }]
+      responses: { '200': { description: OK } }
+    post:
+      tags: [Calendar feeds]
+      operationId: createCalendarFeed
+      security: [{ ApiKey: [resources:read] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope, target_id]
+              properties:
+                scope: { type: string, enum: [resource, provider, user] }
+                target_id: { type: integer }
+      responses: { '201': { description: Created } }
+
+  /calendar-feeds/{id}:
+    delete:
+      tags: [Calendar feeds]
+      operationId: deleteCalendarFeed
+      security: [{ ApiKey: [resources:read] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '200': { description: Deleted } }
+
+  /calendar-feeds/{id}/rotate-token:
+    post:
+      tags: [Calendar feeds]
+      summary: Revoke the current token and issue a new one
+      operationId: rotateCalendarFeedToken
+      security: [{ ApiKey: [resources:read] }]
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses: { '200': { description: Rotated } }
+
+  /providers:
+    get:
+      tags: [Providers]
+      summary: The key's providers (facilities)
+      description: |
+        ✅ **Shipped (preview-v13).** Exactly the resolved provider set every other endpoint is scoped
+        to. Filter by `name` (eq | contains | starts_with); sort by `id`, `name`.
+      operationId: listProviders
+      security: [{ ApiKey: [resources:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - name: 'filter[name]'
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/CollectionEnvelope' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Provider' } } } }] } } } }
+
+  /providers/{id}:
+    get:
+      tags: [Providers]
+      operationId: getProvider
+      security: [{ ApiKey: [resources:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/Provider' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /resource-types:
+    get:
+      tags: [Resource types]
+      summary: Resource types in use by the key's providers, with their parents
+      description: |
+        ✅ **Shipped (preview-v13).** Types are a global table; the visible set is the types the
+        key's providers' resources use plus their parents — enough to resolve every
+        `resource_type_id` the resources endpoint emits. Single-level hierarchy via `parent_id`.
+      operationId: listResourceTypes
+      security: [{ ApiKey: [resources:read] }]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+        - name: 'filter[name]'
+          in: query
+          schema: { type: string, description: 'eq | contains | starts_with' }
+        - name: 'filter[parent_id]'
+          in: query
+          schema: { type: integer }
+        - name: 'filter[status]'
+          in: query
+          schema: { type: string, enum: [active, inactive] }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/CollectionEnvelope' }, { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/ResourceType' } } } }] } } } }
+
+  /resource-types/{id}:
+    get:
+      tags: [Resource types]
+      operationId: getResourceType
+      security: [{ ApiKey: [resources:read] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: OK, headers: { ETag: { $ref: '#/components/headers/ETag' } }, content: { application/json: { schema: { $ref: '#/components/schemas/ResourceType' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /providers/{id}/calendar.ics:
+    get:
+      tags: [Calendar feeds]
+      summary: iCalendar feed for all resources in a provider
+      operationId: getProviderCalendarFeed
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PathId'
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            text/calendar:
+              schema: { type: string }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # STATISTICS
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /statistics/usage:
+    get:
+      tags: [Statistics]
+      summary: Resource usage aggregated by user / group / resource
+      description: Date ranges > 3 months return 202 with a task_id.
+      operationId: getUsageStatistics
+      security: [{ ApiKey: [resources:read] }]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: group_by
+          in: query
+          schema: { type: string, enum: [user, group, resource, organization], default: resource }
+      responses: { '200': { description: OK } }
+
+  /statistics/utilization:
+    get:
+      tags: [Statistics]
+      operationId: getUtilizationStatistics
+      security: [{ ApiKey: [resources:read] }]
+      responses: { '200': { description: OK } }
+
+  /statistics/heatmap:
+    get:
+      tags: [Statistics]
+      operationId: getHeatmapStatistics
+      security: [{ ApiKey: [resources:read] }]
+      responses: { '200': { description: OK } }
+
+  /statistics/totals:
+    get:
+      tags: [Statistics]
+      operationId: getTotalsStatistics
+      security: [{ ApiKey: [resources:read] }]
+      responses: { '200': { description: OK } }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # NOTIFICATIONS
+  # ─────────────────────────────────────────────────────────────────────────
+
+  /notifications/banner:
+    get:
+      tags: [Notifications]
+      summary: Current system-wide banner message
+      operationId: getNotificationBanner
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, nullable: true }
+                  level: { type: string, enum: [info, warning, critical], nullable: true }
+                  expires_at: { type: string, format: date-time, nullable: true }
+
+# ════════════════════════════════════════════════════════════════════════════
+# COMPONENTS
+# ════════════════════════════════════════════════════════════════════════════
+
+components:
+
+  securitySchemes:
+    ApiKey:
+      type: http
+      scheme: bearer
+      description: |
+        `Authorization: Bearer oi_live_{key_id}_{secret}` (or `oi_test_…` for sandbox).
+        Keys carry scopes and are bound to a resolved set of providers (explicit grants +
+        organization convenience grants; see proposal §2).
+
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+      description: Opaque pagination cursor. Use `links.next` from the previous response.
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 50, minimum: 1, maximum: 500 }
+    Sort:
+      name: sort
+      in: query
+      schema: { type: string }
+      description: |
+        Comma-separated field list. Prefix `-` for descending. Example: `-created_at,name`.
+        Allowed fields are endpoint-specific; unknown fields return 400.
+    Fields:
+      name: fields
+      in: query
+      schema: { type: string }
+      description: |
+        Sparse fieldsets, type-scoped: `fields[booking]=id,start,end&fields[charge]=amount`.
+        Reduces payload size.
+    Expand:
+      name: expand
+      in: query
+      schema: { type: string }
+      description: |
+        Comma-separated list of relations to expand inline. Result nests expanded objects as
+        `embeds.{relation}.data`. Example: `expand=resource,user`.
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, maxLength: 64 }
+      description: |
+        Required on all `POST`, `PATCH`, and non-cancel `DELETE`. Responses cached 24 h per
+        `(api_key_id, key)` pair. Re-posting with the same key and same body returns the cached
+        response; different body returns 422.
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: { type: string }
+      description: Required on `PATCH`. Value is the `ETag` from the last GET. Mismatch returns 412.
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+    PathIdStr:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+
+  headers:
+    ETag:
+      schema: { type: string }
+      description: Opaque version tag. Send back as `If-Match` on the next PATCH.
+    XTotalRecords:
+      schema: { type: integer }
+      description: Total items across all pages in the current filter.
+    RateLimitLimit:
+      schema: { type: integer }
+      description: Requests allowed in the current window.
+    RateLimitRemaining:
+      schema: { type: integer }
+      description: Requests remaining in the current window. Only accurate on 429 in preview-v7.
+    RateLimitReset:
+      schema: { type: integer }
+      description: Seconds until the current rate-limit window resets.
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+          example:
+            type: https://docs.openiris.io/errors/401
+            title: Unauthorized
+            status: 401
+            code: unauthorized
+            detail: API key is missing, revoked, or expired.
+            trace_id: 4db8e9a...
+    Forbidden:
+      description: Scope insufficient or resource out of tenant scope
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Resource does not exist or is not visible to the caller
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Conflict:
+      description: State conflict (e.g. booking overlap)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Unprocessable:
+      description: Validation error
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After: { schema: { type: integer } }
+        RateLimit-Reset: { $ref: '#/components/headers/RateLimitReset' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+
+    # ── Envelopes & common ──────────────────────────────────────────────────
+
+    CollectionEnvelope:
+      type: object
+      description: Shape of every collection response.
+      properties:
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+            cursor_next: { type: string, nullable: true }
+            cursor_prev: { type: string, nullable: true }
+        links:
+          type: object
+          properties:
+            self: { type: string, format: uri }
+            next: { type: string, format: uri, nullable: true }
+            prev: { type: string, format: uri, nullable: true }
+            first: { type: string, format: uri }
+            last: { type: string, format: uri }
+
+    ResourceLinks:
+      type: object
+      properties:
+        self: { type: string, format: uri }
+        html: { type: string, format: uri, description: Deep link into the OpenIRIS admin UI }
+
+    ProblemDetails:
+      type: object
+      description: RFC 9457 Problem Details.
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code:
+          type: string
+          enum: [bad_request, unauthorized, forbidden, not_found, conflict, unprocessable, rate_limited, internal_error]
+        trace_id: { type: string }
+        data: { type: object, additionalProperties: true }
+
+    # ── Ping ────────────────────────────────────────────────────────────────
+
+    PingResponse:
+      type: object
+      required: [status, provider_ids, scopes, server_time]
+      properties:
+        status: { type: string, example: ok }
+        provider_ids: { type: array, items: { type: integer } }
+        scopes: { type: array, items: { type: string } }
+        server_time: { type: string, format: date-time }
+
+    # ── Charges ─────────────────────────────────────────────────────────────
+
+    ChargeSource:
+      type: string
+      enum: [booking, request, product]
+      description: Which of the three polymorphic DB tables this charge originated from.
+
+    CostCenter:
+      type: object
+      description: |
+        The collapsed cost-center assignment embedded on a charge (shipped preview-v13; the same
+        shape is proposed for bookings and requests). Resolved from the booking or request the
+        charge came from — the charge tables carry no cost-center column. Null on the charge when
+        nothing is assigned. Not the standalone /cost-centers entity — see CostCenterAccount.
+      properties:
+        provider_cost_center_id: { type: integer, nullable: true, description: 'Id in /cost-centers' }
+        provider_code:
+          type: string
+          nullable: true
+          description: ERP-posting code (SAP WBS / cost center, Oracle Code Block) — the provider cost center's code.
+        provider_name: { type: string, nullable: true }
+        group_code: { type: string, nullable: true, description: 'Group-level cost center code, when the booking or request carries one' }
+        organization_code: { type: string, nullable: true }
+        user_code: { type: string, nullable: true }
+
+    CostCenterAccount:
+      type: object
+      description: The standalone provider cost-center entity served by /cost-centers (writable since preview-v8).
+      properties:
+        id: { type: integer }
+        code: { type: string, maxLength: 10, description: Unique per provider; ≤10 alphanumeric (SAP limit) }
+        name: { type: string }
+        remit_code: { type: string, nullable: true }
+        status: { type: string, enum: [active, inactive] }
+        billing_address: { type: string, nullable: true }
+        is_default: { type: boolean }
+        provider_id: { type: integer }
+        created_at: { type: string, format: date-time }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    Charge:
+      type: object
+      required: [id, source, provider_id, user_id, currency, total, status, created_at, links]
+      properties:
+        id: { type: integer }
+        source: { $ref: '#/components/schemas/ChargeSource' }
+        source_id: { type: integer }
+        booking_id: { type: integer, nullable: true }
+        request_id: { type: integer, nullable: true }
+        provider_id: { type: integer }
+        user_id: { type: integer }
+        group_id: { type: integer, nullable: true }
+        project_id: { type: integer, nullable: true }
+        cost_center: { $ref: '#/components/schemas/CostCenter' }
+        currency: { type: string, example: EUR, description: ISO 4217 code }
+        total: { type: number }
+        discount_percent: { type: number, nullable: true }
+        rebate_amount: { type: number, nullable: true }
+        tax_amount: { type: number, nullable: true }
+        tax_rate: { type: number, nullable: true }
+        tax_code: { type: string, maxLength: 10, nullable: true }
+        is_waived: { type: boolean }
+        invoice_id: { type: integer, nullable: true }
+        invoice_date: { type: string, format: date-time, nullable: true }
+        invoice_date_local: { type: string, format: date-time, nullable: true, description: Local-time mirror; use this for SAP PostingDate to avoid wrong-period posting }
+        status: { type: string, enum: [unbilled, invoiced, exported, waived, cancelled] }
+        confirmed_at: { type: string, format: date-time, nullable: true, description: 'When a billing admin signed this charge off as ready to bill. Independent of status — it survives invoicing and export.' }
+        period_start: { type: string, format: date-time }
+        period_start_local: { type: string, format: date-time }
+        period_end: { type: string, format: date-time }
+        period_end_local: { type: string, format: date-time }
+        external_reference:
+          type: string
+          maxLength: 35
+          nullable: true
+          description: Integrator-populated, round-tripped. Sized for SAP DocumentReferenceID.
+        external_account_assignment:
+          type: object
+          additionalProperties: true
+          description: Passthrough for ERP mapping (WBS element, Oracle Code Block overrides, etc.)
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time, nullable: true, description: 'Currently NULL on ~75% of rows — see proposal §9 P0' }
+        recalculated_at: { type: string, format: date-time, nullable: true }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    ChargeConfirmation:
+      type: object
+      description: |
+        One billing-admin sign-off. A charge has at most one; withdrawing deletes it.
+      properties:
+        charge_id: { type: integer }
+        confirmed_at: { type: string, format: date-time }
+        notes: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    ChargeLineItem:
+      type: object
+      properties:
+        id: { type: integer }
+        date: { type: string, format: date-time }
+        amount: { type: number }
+        quantity: { type: number, nullable: true }
+        price_item_code: { type: string, nullable: true }
+        price_value: { type: number, nullable: true }
+        currency: { type: string, example: EUR }
+        off_hours: { type: boolean }
+        is_training: { type: boolean }
+        summary: { type: string, nullable: true }
+        period_start: { type: string, format: date-time, nullable: true }
+        period_end: { type: string, format: date-time, nullable: true }
+        order_number: { type: integer, description: Proposed - not yet served. }
+        tax_amount: { type: number, nullable: true }
+        tax_rate: { type: number, nullable: true }
+        tax_code: { type: string, nullable: true }
+
+    ChargeExport:
+      type: object
+      properties:
+        id: { type: integer }
+        external_id: { type: string }
+        external_system: { type: string }
+        exported_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        exported_by_key_id: { type: string, description: Proposed - not yet served. }
+        notes: { type: string, nullable: true }
+
+    # ── Invoices ────────────────────────────────────────────────────────────
+
+    Invoice:
+      type: object
+      description: |
+        preview-v8 correction: the singular `cost_center` field was removed — an invoice may span
+        many cost centers (institutions invoice all groups quarterly in one document). Per-cost-
+        center breakdown comes from grouping `/invoices/{id}/charges` by `cost_center`.
+      properties:
+        id: { type: integer }
+        display_id: { type: integer, nullable: true }
+        provider_id: { type: integer }
+        user_id: { type: integer }
+        cost_center_count: { type: integer, description: Distinct cost centers across the invoice's charges }
+        currency: { type: string, example: EUR }
+        subtotal: { type: number }
+        tax_total: { type: number }
+        total: { type: number }
+        status: { type: string, enum: [draft, sent, paid, void] }
+        issued_at: { type: string, format: date-time, nullable: true }
+        due_at: { type: string, format: date-time, nullable: true }
+        paid_at: { type: string, format: date-time, nullable: true }
+        charge_count: { type: integer }
+        external_reference: { type: string, maxLength: 35, nullable: true }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    InvoicePatch:
+      type: object
+      properties:
+        status: { type: string, enum: [draft, sent, paid, void] }
+        due_at: { type: string, format: date-time, nullable: true }
+        paid_at: { type: string, format: date-time, nullable: true }
+        external_reference: { type: string, maxLength: 35, nullable: true }
+
+    # ── Bookings ────────────────────────────────────────────────────────────
+
+    BookingStatus:
+      type: string
+      enum: [confirmed, pending_approval, rejected, cancelled, completed]
+      description: |
+        Derived server-side (no backing column). See proposal Appendix A. Filtering by status
+        translates to explicit SQL predicates — mapping is stable across versions.
+
+    Booking:
+      type: object
+      required: [id, guid, start, end, status, resource_id, user_id, links]
+      properties:
+        id: { type: integer }
+        guid: { type: string, format: uuid }
+        title: { type: string, nullable: true }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/BookingStatus' }
+        kind: { type: string, enum: [booking, usage], description: 'usage = recorded after the fact through the Public API (preview-v13)' }
+        resource_id: { type: integer }
+        provider_id: { type: integer, description: 'Inherited from the resource (preview-v13)' }
+        user_id: { type: integer }
+        group_id: { type: integer, nullable: true }
+        project_id: { type: integer, nullable: true }
+        request_id: { type: integer, nullable: true }
+        series_id: { type: integer, nullable: true }
+        operator_id: { type: integer, nullable: true }
+        operator_assisted: { type: boolean }
+        approval_status: { type: string, nullable: true, enum: [approved, pending, rejected, null], description: 'NULL means no approval required (not pending)' }
+        parent_booking_id: { type: integer, nullable: true, description: 'Set on add-on rows (preview-v13)' }
+        is_cancelled: { type: boolean }
+        cancelled_at: { type: string, format: date-time, nullable: true }
+        cost_center: { $ref: '#/components/schemas/CostCenter' }
+        comments: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        charge_purged: { type: boolean }
+        external_reference: { type: string, maxLength: 35, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time, nullable: true }
+        current_caller_can_cancel: { type: boolean }
+        current_caller_can_edit: { type: boolean }
+        current_caller_can_approve: { type: boolean }
+        current_caller_can_reject: { type: boolean }
+        current_caller_can_view_charges: { type: boolean }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    BookingCreate:
+      type: object
+      required: [kind, resource_id, user_id, start, end]
+      properties:
+        kind: { type: string, enum: [usage, booking], description: 'usage (shipped): a completed measurement, entirely in the past. booking (next increment): a reservation in advance.' }
+        resource_id: { type: integer }
+        user_id: { type: integer }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        title: { type: string }
+        group_id: { type: integer }
+        project_id: { type: integer }
+        operator_id: { type: integer }
+        comments: { type: string }
+        external_reference: { type: string, maxLength: 35 }
+
+    BookingPatch:
+      type: object
+      description: The integrator-owned fields (preview-v13). Times, users and resources are not editable through the Public API.
+      properties:
+        external_reference: { type: string, maxLength: 35, description: 'Empty string clears it' }
+        comments: { type: string, maxLength: 4000 }
+
+    CurrentBooking:
+      type: object
+      description: Door-access answer from GET /resources/{id}/current-booking (preview-v13).
+      required: [resource_id, user_id, at, access]
+      properties:
+        resource_id: { type: integer }
+        user_id: { type: integer }
+        at: { type: string, format: date-time }
+        access: { type: boolean }
+        via: { type: string, nullable: true, enum: [user, group, null], description: 'How the user matched; null when access is false' }
+        booking: { allOf: [{ $ref: '#/components/schemas/Booking' }], nullable: true }
+
+    BookingSeries:
+      type: object
+      properties:
+        id: { type: integer }
+        guid: { type: string, format: uuid }
+        title: { type: string, nullable: true }
+        mode: { type: string, enum: [daily, weekly, monthly] }
+        interval: { type: integer, nullable: true }
+        by_days: { type: array, items: { type: string } }
+        ending_type: { type: string, enum: [never, count, until], nullable: true }
+        end_count: { type: integer, nullable: true }
+        end_until: { type: string, format: date-time, nullable: true }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        resource_id: { type: integer }
+        user_id: { type: integer }
+        is_cancelled: { type: boolean }
+        canceled_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    BookingSeriesCreate:
+      type: object
+      required: [resource_id, user_id, start, end, mode]
+      properties:
+        resource_id: { type: integer }
+        user_id: { type: integer }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        title: { type: string }
+        mode: { type: string, enum: [daily, weekly, monthly] }
+        interval: { type: integer }
+        by_days: { type: array, items: { type: string } }
+        ending_type: { type: string, enum: [never, count, until] }
+        end_count: { type: integer }
+        end_until: { type: string, format: date-time }
+        completion_webhook_url: { type: string, format: uri }
+
+    # ── Resources ───────────────────────────────────────────────────────────
+
+    ResourceClass:
+      type: string
+      # preview-v9 correction: the REAL domain classes (the earlier
+      # equipment|service|facility enum was aspirational and wrong).
+      enum: [scheduled, application, service, scheduled_addon, event]
+
+    Resource:
+      type: object
+      properties:
+        id: { type: integer }
+        guid: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        class: { $ref: '#/components/schemas/ResourceClass' }
+        status: { type: string, enum: [active, inactive, archived], description: 'inactive = not bookable (offline, or provisioned and not yet configured); archived = terminal, set via /transitions' }
+        provider_id: { type: integer }
+        resource_type_id: { type: integer }
+        location: { type: string, nullable: true }
+        manufacturer: { type: string, nullable: true }
+        model_number: { type: string, nullable: true }
+        serial_number: { type: string, nullable: true }
+        rfid: { type: string, nullable: true }
+        concurrent_booking_enabled: { type: boolean }
+        request_based_booking_enabled: { type: boolean }
+        timezone: { type: string, example: Europe/Berlin, description: Resolved from the parent Provider }
+        gl_account_hint: { type: string, nullable: true, description: Admin-set GL account code for ERP mapping (pass-through) }
+        external_reference: { type: string, maxLength: 35, nullable: true, description: 'Asset-management mapping key; unique per provider (new in preview-v8)' }
+        created_at: { type: string, format: date-time }
+        archived_at: { type: string, format: date-time, nullable: true, description: 'Set by the archive transition (preview-v13)' }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    ResourceProvision:
+      type: object
+      description: Master-data-only create body for POST /resources (shipped preview-v13). Everything else is configured in the OpenIRIS UI.
+      required: [name, external_reference, resource_type_id]
+      properties:
+        name: { type: string, maxLength: 400 }
+        provider_id: { type: integer, description: 'May be omitted when the key resolves to exactly one provider' }
+        resource_type_id: { type: integer, description: 'Required — resolve via GET /resource-types' }
+        class: { $ref: '#/components/schemas/ResourceClass' }
+        description: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        manufacturer: { type: string, nullable: true }
+        model_number: { type: string, nullable: true }
+        serial_number: { type: string, nullable: true }
+        external_reference: { type: string, maxLength: 35, description: Unique per provider — the asset-system mapping key }
+
+    Provider:
+      type: object
+      description: A facility (core) the key is scoped to (preview-v13).
+      required: [id, guid, name]
+      properties:
+        id: { type: integer }
+        guid: { type: string, format: uuid }
+        name: { type: string }
+        short_name: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        url: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        contacts: { type: string, nullable: true }
+        usage_policy_url: { type: string, nullable: true }
+        is_billing_enabled: { type: boolean }
+        timezone: { type: string, nullable: true, example: Europe/Berlin, description: IANA zone; resources inherit it }
+        currency: { type: string, nullable: true, example: EUR, description: ISO 4217 }
+        created_at: { type: string, format: date-time, nullable: true }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    ResourceType:
+      type: object
+      description: A resource type in use by the key's providers, or a parent of one (preview-v13).
+      required: [id, guid, name, status]
+      properties:
+        id: { type: integer }
+        guid: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        parent_id: { type: integer, nullable: true, description: null on a top-level type }
+        status: { type: string, enum: [active, inactive] }
+        is_public: { type: boolean }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    # ── Requests ────────────────────────────────────────────────────────────
+
+    Request:
+      type: object
+      properties:
+        id: { type: integer }
+        guid: { type: string, format: uuid }
+        name: { type: string }
+        alt_id: { type: string, nullable: true }
+        service_id: { type: integer, description: FK to Resource }
+        provider_id: { type: integer, description: "Owning provider, inherited from the service" }
+        status:
+          type: string
+          enum: [pending, active, rejected, closed, inactive, reviewed, discontinued]
+          description: The stored request lifecycle state.
+        start: { type: string, format: date-time, nullable: true }
+        end: { type: string, format: date-time, nullable: true }
+        user_id: { type: integer }
+        group_id: { type: integer, nullable: true }
+        project_id: { type: integer, nullable: true }
+        budget: { type: number, nullable: true }
+        actual_budget: { type: number, nullable: true }
+        cost_center: { $ref: '#/components/schemas/CostCenter' }
+        external_reference: { type: string, maxLength: 35, nullable: true }
+        created_at: { type: string, format: date-time }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    Group:
+      type: object
+      description: >-
+        A group the key can see: one belonging to an organization trusted by the
+        key's resolved providers.
+      required: [id, name, organization_id]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        short_name: { type: string, nullable: true }
+        organization_id: { type: integer }
+        contact_email: { type: string, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    GroupMember:
+      type: object
+      description: >-
+        One group membership. Membership drives access and billing attribution;
+        changing it never retro-affects existing bookings or charges.
+      required: [user_id, group_id, status, joined_on]
+      properties:
+        user_id: { type: integer }
+        group_id: { type: integer }
+        status:
+          type: string
+          enum: [active, pending, disabled, blocked]
+          description: >-
+            Legacy semantics: the stored "closed" state is the ACTIVE one and is
+            served as `active`.
+        joined_on: { type: string, format: date-time }
+
+    RequestParticipant:
+      type: object
+      required: [user_id, request_id, role, email, organization_id, added_at]
+      properties:
+        user_id: { type: integer }
+        request_id: { type: integer }
+        role:
+          type: string
+          enum: [owner, participant]
+          description: The owner is the submitter and is always returned first.
+        status:
+          type: string
+          enum: [pending, approved, rejected, inactive]
+          nullable: true
+          description: |
+            Null for an owner with no participant row of their own, and for rows
+            that predate the status column. Access does not depend on it.
+        email: { type: string }
+        first_name: { type: string, nullable: true }
+        last_name: { type: string, nullable: true }
+        organization_id: { type: integer }
+        added_at:
+          type: string
+          format: date-time
+          description: Falls back to the request creation date for rows that predate the column.
+        added_by_user_id: { type: integer, nullable: true }
+
+    RequestCreate:
+      type: object
+      description: >-
+        Create body for POST /requests (proposed). `type` is parked with the
+        training-request union - the shipped read surface has no type field.
+      required: [name, service_id, user_id, type]
+      properties:
+        name: { type: string }
+        type: { type: string, enum: [service, training] }
+        service_id: { type: integer }
+        user_id: { type: integer }
+        group_id: { type: integer }
+        project_id: { type: integer }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        budget: { type: number }
+        external_reference: { type: string, maxLength: 35 }
+
+    RequestPatch:
+      type: object
+      properties:
+        name: { type: string }
+        start: { type: string, format: date-time }
+        end: { type: string, format: date-time }
+        budget: { type: number }
+        actual_budget: { type: number }
+        external_reference: { type: string, maxLength: 35 }
+
+    # ── Attachments, Forms, other ──────────────────────────────────────────
+
+    Attachment:
+      type: object
+      required: [id, file_name, sha256, size_bytes, immutable, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        file_name: { type: string }
+        content_type: { type: string, nullable: true }
+        size_bytes: { type: integer }
+        sha256: { type: string, description: SHA-256 hex of the content — integrators verify after download }
+        immutable: { type: boolean, description: True once a referencing charge reaches status=exported }
+        created_at: { type: string, format: date-time }
+        uploaded_by_user_id: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        links:
+          type: object
+          properties:
+            self: { type: string, format: uri }
+            content: { type: string, format: uri }
+
+    FormFieldType:
+      type: string
+      enum: [text, number, boolean, date, select, multiselect, attachment, url, user_ref, resource_ref, booking_ref, request_ref]
+
+    FormField:
+      type: object
+      properties:
+        name: { type: string }
+        label: { type: string }
+        type: { $ref: '#/components/schemas/FormFieldType' }
+        required: { type: boolean }
+        validation:
+          type: object
+          properties:
+            min: { type: number, nullable: true }
+            max: { type: number, nullable: true }
+            pattern: { type: string, nullable: true }
+            options: { type: array, items: { type: string } }
+
+    Form:
+      type: object
+      properties:
+        id: { type: integer }
+        provider_id: { type: integer }
+        resource_id: { type: integer }
+        title: { type: string }
+        is_required: { type: boolean }
+        comment: { type: string, nullable: true }
+        fields: { type: array, items: { $ref: '#/components/schemas/FormField' } }
+        version: { type: string }
+
+    FormSubmission:
+      type: object
+      properties:
+        id: { type: integer }
+        form_id: { type: integer }
+        booking_id: { type: integer, nullable: true }
+        request_id: { type: integer, nullable: true }
+        user_id: { type: integer }
+        submission_date: { type: string, format: date-time }
+        form_schema_version: { type: string }
+        data:
+          type: object
+          description: Typed key-value pairs per the form's field schema.
+          additionalProperties: true
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        email: { type: string, format: email }
+        first_name: { type: string, nullable: true }
+        last_name: { type: string, nullable: true }
+        orcid: { type: string, nullable: true }
+        is_verified: { type: boolean }
+        is_disabled: { type: boolean }
+        organization_id: { type: integer }
+        created_at: { type: string, format: date-time, nullable: true }
+        last_login_at: { type: string, format: date-time, nullable: true }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    Project:
+      type: object
+      description: An organization-owned project with direct members (shipped preview-v13). Members are read from GET /projects/{id}/members.
+      required: [id, name, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        short_name: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [active, on_hold, inactive, published] }
+        organization_id: { type: integer, nullable: true }
+        group_id: { type: integer, nullable: true }
+        start: { type: string, format: date-time, nullable: true }
+        end: { type: string, format: date-time, nullable: true }
+        external_reference: { type: string, maxLength: 35, nullable: true, description: 'Proposal-system mapping key; unique within the organization (corrected in preview-v13 — projects are organization-owned)' }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+        links: { $ref: '#/components/schemas/ResourceLinks' }
+
+    ProjectMember:
+      type: object
+      description: One direct membership or admin row, identity inlined (preview-v13).
+      required: [user_id, project_id, role, email]
+      properties:
+        user_id: { type: integer }
+        project_id: { type: integer }
+        role: { type: string, enum: [member, admin] }
+        status: { type: string, nullable: true, enum: [active, pending, disabled, blocked, null], description: null for an admin without a member row }
+        email: { type: string, format: email }
+        first_name: { type: string, nullable: true }
+        last_name: { type: string, nullable: true }
+        organization_id: { type: integer }
+        joined_on: { type: string, format: date-time, nullable: true }
+
+    ProjectCreate:
+      type: object
+      description: Create body for POST /projects (shipped preview-v13). organization_id may be omitted when group_id is given.
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 200 }
+        short_name: { type: string, maxLength: 100, nullable: true }
+        description: { type: string, maxLength: 200, nullable: true }
+        group_id: { type: integer, nullable: true }
+        organization_id: { type: integer, nullable: true }
+        start: { type: string, format: date-time, nullable: true }
+        end: { type: string, format: date-time, nullable: true }
+        member_emails:
+          type: array
+          items: { type: string, format: email }
+          description: Resolved against existing users; no accounts are auto-created — misses come back in `unmatched_emails`.
+        external_reference: { type: string, maxLength: 35, nullable: true }
+
+    # ── Webhooks ────────────────────────────────────────────────────────────
+
+    Webhook:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string, format: uri }
+        events: { type: array, items: { type: string } }
+        description: { type: string, nullable: true }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        last_delivered_at: { type: string, format: date-time, nullable: true }
+        recent_failure_count: { type: integer }
+
+    WebhookCreate:
+      type: object
+      required: [url, events]
+      properties:
+        url: { type: string, format: uri }
+        events: { type: array, items: { type: string }, example: [charge.exported, booking.cancelled] }
+        description: { type: string }
+        secret_rotation: { type: string, enum: [none, monthly, quarterly], default: none }
+
+    WebhookPatch:
+      type: object
+      properties:
+        url: { type: string, format: uri }
+        events: { type: array, items: { type: string } }
+        description: { type: string }
+        is_active: { type: boolean }
+
+    WebhookDelivery:
+      type: object
+      properties:
+        id: { type: string }
+        webhook_id: { type: integer }
+        event: { type: string }
+        attempted_at: { type: string, format: date-time }
+        response_status: { type: integer, nullable: true }
+        response_body_excerpt: { type: string, nullable: true }
+        succeeded: { type: boolean }
+        attempt_number: { type: integer }
+        next_retry_at: { type: string, format: date-time, nullable: true }
+
+    EventCatalogEntry:
+      type: object
+      properties:
+        name: { type: string, example: charge.exported }
+        description: { type: string }
+        payload_schema_url: { type: string, format: uri }
+
+    # ── Async tasks ─────────────────────────────────────────────────────────
+
+    Task:
+      type: object
+      properties:
+        id: { type: string, example: tsk_abc123 }
+        status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
+        progress: { type: integer, minimum: 0, maximum: 100, nullable: true }
+        result_url: { type: string, format: uri, nullable: true }
+        error:
+          type: object
+          nullable: true
+          properties:
+            code: { type: string }
+            message: { type: string }
+        started_at: { type: string, format: date-time, nullable: true }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+  examples:
+    ChargesList:
+      summary: Page of charges
+      value:
+        data:
+          - id: 5730465
+            source: booking
+            source_id: 4526529
+            booking_id: 4526529
+            provider_id: 5
+            user_id: 18342
+            group_id: 221
+            cost_center:
+              provider_code: "MDC-IMG-01"
+              organization: "MDC"
+              group: "Müller Lab"
+            currency: EUR
+            total: 36.225
+            tax_amount: 5.79
+            tax_rate: 0.19
+            tax_code: "DE-19"
+            is_waived: false
+            status: invoiced
+            invoice_id: 7610
+            invoice_date: 2026-03-10T00:00:00Z
+            invoice_date_local: 2026-03-10T01:00:00Z
+            period_start: 2026-03-10T15:00:00Z
+            period_end: 2026-03-10T15:30:00Z
+            external_reference: null
+            created_at: 2026-03-07T00:22:32Z
+            updated_at: null
+            links:
+              self: https://api.openiris.io/v1/charges/5730465
+              html: https://openiris.io/admin/charges/5730465
+        meta: { total: 12430, cursor_next: eyJpIjo1NzMwNDI...", cursor_prev: null }
+        links:
+          self: https://api.openiris.io/v1/charges?limit=50
+          next: https://api.openiris.io/v1/charges?cursor=eyJpIjo1NzMwNDI...
+          prev: null
+          first: https://api.openiris.io/v1/charges?limit=50
+          last: https://api.openiris.io/v1/charges?cursor=eyJ...

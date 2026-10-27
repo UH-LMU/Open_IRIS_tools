@@ -1,0 +1,24 @@
+name: check-notebook-outputs
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify-notebooks-stripped:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: pip install nbstripout
+      - name: Fail if any committed notebook still has outputs or execution counts
+        run: |
+          shopt -s globstar nullglob
+          files=(**/*.ipynb)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No notebooks found."
+            exit 0
+          fi
+          nbstripout --verify "${files[@]}"
